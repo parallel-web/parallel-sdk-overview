@@ -25,7 +25,7 @@ jobs:
       - name: Run NLang processor
         env:
           UITHUB_SECRET: ${{ secrets.UITHUB_SECRET }}
-          LLM_SECRET: ${{ secrets.LLM_SECRET }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
           LLM_BASEPATH: ${{ secrets.LLM_BASEPATH }}
         run: node nlang.js
