@@ -5,7 +5,7 @@ import { config } from "dotenv";
 // Load .env file when running locally
 config();
 
-const { LLM_SECRET, LLM_MODEL, LLM_BASEPATH } = process.env;
+const { OPENAI_API_KEY, LLM_MODEL, LLM_BASEPATH } = process.env;
 
 function getSecretForHostname(hostname) {
   // Convert hostname to env var format: github.com -> GITHUB_SECRET
@@ -71,7 +71,7 @@ async function chat(prompt) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${LLM_SECRET}`,
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
       model: LLM_MODEL,
