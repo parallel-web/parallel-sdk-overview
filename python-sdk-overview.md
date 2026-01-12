@@ -1,22 +1,23 @@
-Below is a **single stub file** (`parallel.pyi`) that summarizes the *public* API footprint exposed by this repo. It focuses on what an SDK user (or an LLM) needs to know: top-level exports, client classes, resources, primary methods, return types, and the important data models/types. I’ve copied docstrings **1:1 where present** in the relevant public resource methods (notably `TaskRunResource` and beta resources). Many other classes in the repository have only field doc-comments (triple-quoted strings under attributes) which are not docstrings; those are represented as typed attributes here.
+Below is a single **`parallel.pyi`** “API footprint” stub that an LLM can scan to understand the public surface area of this SDK. I’ve included **docstrings copied 1:1** where they appear in the provided sources (notably the resource methods). For the many generated `types/*` models that have no module-level docstrings, I included their **field docstrings** where present.
 
-> Note: This is a summarization stub. It is intentionally not a 1:1 stub of every internal helper, but it does include the “entire footprint” of the API surface area that users interact with via `parallel.Parallel`, `parallel.AsyncParallel`, `parallel.task_run`, and `parallel.beta.*`.
-
----
+> Notes / limitations:
+> - This is a **summary**: it focuses on the primary imports/exports (`parallel.__init__`, `Parallel`/`AsyncParallel`, resources, key types, beta types). It doesn’t mirror every internal `_utils/*` helper.
+> - Some model field docstrings exist in the source and are included; for many param TypedDicts the interesting docstrings are also included where present.
+> - This is designed for “LLM readability”, not for perfect type-checker fidelity across all internal generics.
 
 ```pyi
 # parallel.pyi
-# Stub summary of the Parallel Python SDK public API footprint.
+# A single-file stub summarizing the public footprint of the `parallel` Python SDK.
 
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import date, datetime
+from types import TracebackType
 from typing import (
     Any,
     Dict,
     Iterable,
     Iterator,
-    AsyncIterator,
     List,
     Mapping,
     Optional,
@@ -25,33 +26,24 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    overload,
     Generic,
+    overload,
 )
-
-from typing_extensions import (
-    Annotated,
-    Literal,
-    Protocol,
-    TypedDict,
-    TypeAlias,
-)
+from typing_extensions import Annotated, Literal, Protocol, TypedDict, TypeAlias
 
 import httpx
 import pydantic
 
-
-# -----------------------------------------------------------------------------
-# Package metadata
-# -----------------------------------------------------------------------------
+# -----------------------------
+# Version
+# -----------------------------
 
 __title__: str
 __version__: str
 
-
-# -----------------------------------------------------------------------------
-# Sentinel / utility types exported at top-level
-# -----------------------------------------------------------------------------
+# -----------------------------
+# Sentinel / options types
+# -----------------------------
 
 class NotGiven:
     """
@@ -102,11 +94,11 @@ NoneType: Type[None]
 
 Transport = httpx.BaseTransport
 Timeout = httpx.Timeout
-ProxiesTypes = Union[str, httpx.Proxy, Dict[Union[str, httpx.URL], Union[None, str, httpx.URL, httpx.Proxy]]]
 
-Headers: TypeAlias = Mapping[str, Union[str, Omit]]
-Query: TypeAlias = Mapping[str, object]
-Body: TypeAlias = object
+# Approximates SDK headers shape
+Headers = Mapping[str, Union[str, Omit]]
+Query = Mapping[str, object]
+Body = object
 
 class RequestOptions(TypedDict, total=False):
     headers: Headers
@@ -117,10 +109,16 @@ class RequestOptions(TypedDict, total=False):
     idempotency_key: str
     follow_redirects: bool
 
+# file convenience
+FileTypes = Union[
+    Union[bytes, Any],  # simplified for footprint
+]
 
-# -----------------------------------------------------------------------------
-# Exceptions exported at top-level
-# -----------------------------------------------------------------------------
+def file_from_path(path: str) -> FileTypes: ...
+
+# -----------------------------
+# Exceptions
+# -----------------------------
 
 class ParallelError(Exception): ...
 
@@ -128,46 +126,37 @@ class APIError(ParallelError):
     message: str
     request: httpx.Request
     body: object | None
+    def __init__(self, message: str, request: httpx.Request, *, body: object | None) -> None: ...
 
 class APIResponseValidationError(APIError):
     response: httpx.Response
     status_code: int
+    def __init__(self, response: httpx.Response, body: object | None, *, message: str | None = None) -> None: ...
 
 class APIStatusError(APIError):
     """Raised when an API response has a status code of 4xx or 5xx."""
     response: httpx.Response
     status_code: int
+    def __init__(self, message: str, *, response: httpx.Response, body: object | None) -> None: ...
 
-class APIConnectionError(APIError): ...
-class APITimeoutError(APIConnectionError): ...
+class APIConnectionError(APIError):
+    def __init__(self, *, message: str = "Connection error.", request: httpx.Request) -> None: ...
 
-class BadRequestError(APIStatusError):
-    status_code: Literal[400]
+class APITimeoutError(APIConnectionError):
+    def __init__(self, request: httpx.Request) -> None: ...
 
-class AuthenticationError(APIStatusError):
-    status_code: Literal[401]
-
-class PermissionDeniedError(APIStatusError):
-    status_code: Literal[403]
-
-class NotFoundError(APIStatusError):
-    status_code: Literal[404]
-
-class ConflictError(APIStatusError):
-    status_code: Literal[409]
-
-class UnprocessableEntityError(APIStatusError):
-    status_code: Literal[422]
-
-class RateLimitError(APIStatusError):
-    status_code: Literal[429]
-
+class BadRequestError(APIStatusError): ...
+class AuthenticationError(APIStatusError): ...
+class PermissionDeniedError(APIStatusError): ...
+class NotFoundError(APIStatusError): ...
+class ConflictError(APIStatusError): ...
+class UnprocessableEntityError(APIStatusError): ...
+class RateLimitError(APIStatusError): ...
 class InternalServerError(APIStatusError): ...
 
-
-# -----------------------------------------------------------------------------
-# Base model type (SDK models subclass this)
-# -----------------------------------------------------------------------------
+# -----------------------------
+# Base model
+# -----------------------------
 
 class BaseModel(pydantic.BaseModel):
     def to_dict(
@@ -180,7 +169,6 @@ class BaseModel(pydantic.BaseModel):
         exclude_none: bool = False,
         warnings: bool = True,
     ) -> Dict[str, object]: ...
-
     def to_json(
         self,
         *,
@@ -192,620 +180,303 @@ class BaseModel(pydantic.BaseModel):
         warnings: bool = True,
     ) -> str: ...
 
-
-# -----------------------------------------------------------------------------
-# Streaming
-# -----------------------------------------------------------------------------
-
-_TStream = TypeVar("_TStream")
-
-class Stream(Generic[_TStream]):
-    """Provides the core interface to iterate over a synchronous stream response."""
-    response: httpx.Response
-    def __iter__(self) -> Iterator[_TStream]: ...
-    def __next__(self) -> _TStream: ...
-    def close(self) -> None: ...
-    def __enter__(self) -> Stream[_TStream]: ...
-    def __exit__(self, exc_type: type[BaseException] | None, exc: BaseException | None, exc_tb: object | None) -> None: ...
-
-class AsyncStream(Generic[_TStream]):
-    """Provides the core interface to iterate over an asynchronous stream response."""
-    response: httpx.Response
-    def __aiter__(self) -> AsyncIterator[_TStream]: ...
-    async def __anext__(self) -> _TStream: ...
-    async def close(self) -> None: ...
-    async def __aenter__(self) -> AsyncStream[_TStream]: ...
-    async def __aexit__(self, exc_type: type[BaseException] | None, exc: BaseException | None, exc_tb: object | None) -> None: ...
-
-
-# -----------------------------------------------------------------------------
-# APIResponse wrappers (raw/streaming response access)
-# -----------------------------------------------------------------------------
-
-R = TypeVar("R")
-TParse = TypeVar("TParse")
-
-class APIResponse(Generic[R]):
-    http_response: httpx.Response
-    retries_taken: int
-    @property
-    def headers(self) -> httpx.Headers: ...
-    @property
-    def status_code(self) -> int: ...
-    @overload
-    def parse(self, *, to: Type[TParse]) -> TParse: ...
-    @overload
-    def parse(self) -> R: ...
-    def read(self) -> bytes: ...
-    def text(self) -> str: ...
-    def json(self) -> object: ...
-    def close(self) -> None: ...
-    def iter_bytes(self, chunk_size: int | None = None) -> Iterator[bytes]: ...
-    def iter_text(self, chunk_size: int | None = None) -> Iterator[str]: ...
-    def iter_lines(self) -> Iterator[str]: ...
-
-class AsyncAPIResponse(Generic[R]):
-    http_response: httpx.Response
-    retries_taken: int
-    @property
-    def headers(self) -> httpx.Headers: ...
-    @property
-    def status_code(self) -> int: ...
-    @overload
-    async def parse(self, *, to: Type[TParse]) -> TParse: ...
-    @overload
-    async def parse(self) -> R: ...
-    async def read(self) -> bytes: ...
-    async def text(self) -> str: ...
-    async def json(self) -> object: ...
-    async def close(self) -> None: ...
-    async def iter_bytes(self, chunk_size: int | None = None) -> AsyncIterator[bytes]: ...
-    async def iter_text(self, chunk_size: int | None = None) -> AsyncIterator[str]: ...
-    async def iter_lines(self) -> AsyncIterator[str]: ...
-
-
-# -----------------------------------------------------------------------------
-# Core types/models (non-beta)
-# -----------------------------------------------------------------------------
-
-# ---- shared models ----
-
-class Warning(BaseModel):
-    message: str
-    type: Literal["spec_validation_warning", "input_validation_warning", "warning"]
-    detail: Optional[Dict[str, object]]
+# -----------------------------
+# Common "shared" types
+# -----------------------------
 
 class ErrorObject(BaseModel):
     message: str
+    """Human-readable message."""
     ref_id: str
-    detail: Optional[Dict[str, object]]
+    """Reference ID for the error."""
+    detail: Optional[Dict[str, object]] = None
+    """Optional detail supporting the error."""
 
 class ErrorResponse(BaseModel):
     error: ErrorObject
+    """An error message."""
     type: Literal["error"]
+    """Always 'error'."""
+
+class Warning(BaseModel):
+    message: str
+    """Human-readable message."""
+    type: Literal["spec_validation_warning", "input_validation_warning", "warning"]
+    """Type of warning.
+
+    Note that adding new warning types is considered a backward-compatible change.
+    """
+    detail: Optional[Dict[str, object]] = None
+    """Optional detail supporting the warning."""
 
 class Citation(BaseModel):
     url: str
-    excerpts: Optional[List[str]]
-    title: Optional[str]
+    """URL of the citation."""
+    excerpts: Optional[List[str]] = None
+    """Excerpts from the citation supporting the output.
+
+    Only certain processors provide excerpts.
+    """
+    title: Optional[str] = None
+    """Title of the citation."""
 
 class FieldBasis(BaseModel):
     field: str
+    """Name of the output field."""
     reasoning: str
-    citations: Optional[List[Citation]]
-    confidence: Optional[str]
+    """Reasoning for the output field."""
+    citations: Optional[List[Citation]] = None
+    """List of citations supporting the output field."""
+    confidence: Optional[str] = None
+    """Confidence level for the output field.
 
+    Only certain processors provide confidence levels.
+    """
 
-# ---- schema models ----
+# -----------------------------
+# Schemas
+# -----------------------------
 
 class AutoSchema(BaseModel):
-    type: Optional[Literal["auto"]]
+    type: Optional[Literal["auto"]] = None
+    """The type of schema being defined. Always `auto`."""
 
 class TextSchema(BaseModel):
-    description: Optional[str]
-    type: Optional[Literal["text"]]
+    description: Optional[str] = None
+    """A text description of the desired output from the task."""
+    type: Optional[Literal["text"]] = None
+    """The type of schema being defined. Always `text`."""
 
 class JsonSchema(BaseModel):
     json_schema: Dict[str, object]
-    type: Optional[Literal["json"]]
+    """A JSON Schema object. Only a subset of JSON Schema is supported."""
+    type: Optional[Literal["json"]] = None
+    """The type of schema being defined. Always `json`."""
 
+# Param typed dicts
+class AutoSchemaParam(TypedDict, total=False):
+    type: Literal["auto"]
+    """The type of schema being defined. Always `auto`."""
+
+class TextSchemaParam(TypedDict, total=False):
+    description: Optional[str]
+    """A text description of the desired output from the task."""
+    type: Literal["text"]
+    """The type of schema being defined. Always `text`."""
+
+class JsonSchemaParam(TypedDict, total=False):
+    json_schema: Dict[str, object]
+    """A JSON Schema object. Only a subset of JSON Schema is supported."""
+    type: Literal["json"]
+    """The type of schema being defined. Always `json`."""
+
+# TaskSpec
 OutputSchema: TypeAlias = Union[JsonSchema, TextSchema, AutoSchema, str]
 InputSchema: TypeAlias = Union[str, JsonSchema, TextSchema, None]
 
 class TaskSpec(BaseModel):
     output_schema: OutputSchema
-    input_schema: Optional[InputSchema]
+    """JSON schema or text fully describing the desired output from the task.
 
+    Descriptions of output fields will determine the form and content of the
+    response. A bare string is equivalent to a text schema with the same
+    description.
+    """
+    input_schema: Optional[InputSchema] = None
+    """Optional JSON schema or text description of expected input to the task.
 
-# ---- task run models ----
+    A bare string is equivalent to a text schema with the same description.
+    """
 
-class TaskRun(BaseModel):
-    created_at: Optional[str]
-    is_active: bool
-    modified_at: Optional[str]
-    processor: str
-    run_id: str
-    status: Literal["queued", "action_required", "running", "completed", "failed", "cancelling", "cancelled"]
-    error: Optional[ErrorObject]
-    metadata: Optional[Dict[str, Union[str, float, bool]]]
-    task_group_id: Optional[str]
-    warnings: Optional[List[Warning]]
-
-class TaskRunTextOutput(BaseModel):
-    basis: List[FieldBasis]
-    content: str
-    type: Literal["text"]
-    beta_fields: Optional[Dict[str, object]]
-
-class TaskRunJsonOutput(BaseModel):
-    basis: List[FieldBasis]
-    content: Dict[str, object]
-    type: Literal["json"]
-    beta_fields: Optional[Dict[str, object]]
-    output_schema: Optional[Dict[str, object]]
-
-TaskRunResultOutput: TypeAlias = Annotated[Union[TaskRunTextOutput, TaskRunJsonOutput], object]
-
-class TaskRunResult(BaseModel):
-    output: TaskRunResultOutput
-    run: TaskRun
-
-
-# ---- parsed task run results (SDK convenience) ----
-
-ContentType = TypeVar("ContentType", bound=pydantic.BaseModel)
-
-class ParsedTaskRunTextOutput(TaskRunTextOutput, Generic[ContentType]):
-    parsed: None
-
-class ParsedTaskRunJsonOutput(TaskRunJsonOutput, Generic[ContentType]):
-    parsed: Optional[ContentType]
-
-class ParsedTaskRunResult(TaskRunResult, Generic[ContentType]):
-    output: Union[ParsedTaskRunTextOutput[ContentType], ParsedTaskRunJsonOutput[ContentType]]
-
-
-# -----------------------------------------------------------------------------
-# Param TypedDicts (non-beta)
-# -----------------------------------------------------------------------------
-
-class AutoSchemaParam(TypedDict, total=False):
-    type: Literal["auto"]
-
-class TextSchemaParam(TypedDict, total=False):
-    description: Optional[str]
-    type: Literal["text"]
-
-class JsonSchemaParam(TypedDict, total=False):
-    json_schema: Required[Dict[str, object]]
-    type: Literal["json"]
-
+# TaskSpecParam
 OutputSchemaParam: TypeAlias = Union[JsonSchemaParam, TextSchemaParam, AutoSchemaParam, str]
 InputSchemaParam: TypeAlias = Union[str, JsonSchemaParam, TextSchemaParam]
 
 OutputT = TypeVar("OutputT", bound=pydantic.BaseModel)
 
 class TaskSpecParam(TypedDict, total=False):
-    output_schema: Required[OutputSchemaParam]
-    input_schema: Optional[InputSchemaParam]
+    output_schema: OutputSchemaParam
+    """JSON schema or text fully describing the desired output from the task.
 
+    Descriptions of output fields will determine the form and content of the
+    response. A bare string is equivalent to a text schema with the same
+    description.
+    """
+    input_schema: Optional[InputSchemaParam]
+    """Optional JSON schema or text description of expected input to the task.
+
+    A bare string is equivalent to a text schema with the same description.
+    """
+
+# -----------------------------
+# Task Run core types (non-beta)
+# -----------------------------
+
+class TaskRun(BaseModel):
+    created_at: Optional[str] = None
+    """Timestamp of the creation of the task, as an RFC 3339 string."""
+    is_active: bool
+    """Whether the run is currently active, i.e.
+
+    status is one of {'cancelling', 'queued', 'running'}.
+    """
+    modified_at: Optional[str] = None
+    """Timestamp of the last modification to the task, as an RFC 3339 string."""
+    processor: str
+    """Processor used for the run."""
+    run_id: str
+    """ID of the task run."""
+    status: Literal["queued", "action_required", "running", "completed", "failed", "cancelling", "cancelled"]
+    """Status of the run."""
+    error: Optional[ErrorObject] = None
+    """An error message."""
+    metadata: Optional[Dict[str, Union[str, float, bool]]] = None
+    """User-provided metadata stored with the run."""
+    task_group_id: Optional[str] = None
+    """ID of the taskgroup to which the run belongs."""
+    warnings: Optional[List[Warning]] = None
+    """Warnings for the run, if any."""
+
+class TaskRunTextOutput(BaseModel):
+    basis: List[FieldBasis]
+    """Basis for the output. The basis has a single field 'output'."""
+    content: str
+    """Text output from the task."""
+    type: Literal["text"]
+    """
+    The type of output being returned, as determined by the output schema of the
+    task spec.
+    """
+    beta_fields: Optional[Dict[str, object]] = None
+    """Additional fields from beta features used in this task run.
+
+    When beta features are specified during both task run creation and result
+    retrieval, this field will be empty and instead the relevant beta attributes
+    will be directly included in the `BetaTaskRunJsonOutput` or corresponding output
+    type. However, if beta features were specified during task run creation but not
+    during result retrieval, this field will contain the dump of fields from those
+    beta features. Each key represents the beta feature version (one amongst
+    parallel-beta headers) and the values correspond to the beta feature attributes,
+    if any. For now, only MCP server beta features have attributes. For example,
+    `{mcp-server-2025-07-17: [{'server_name':'mcp_server', 'tool_call_id': 'tc_123', ...}]}}`
+    """
+
+class TaskRunJsonOutput(BaseModel):
+    basis: List[FieldBasis]
+    """Basis for each top-level field in the JSON output."""
+    content: Dict[str, object]
+    """
+    Output from the task as a native JSON object, as determined by the output schema
+    of the task spec.
+    """
+    type: Literal["json"]
+    """
+    The type of output being returned, as determined by the output schema of the
+    task spec.
+    """
+    beta_fields: Optional[Dict[str, object]] = None
+    """Additional fields from beta features used in this task run.
+
+    When beta features are specified during both task run creation and result
+    retrieval, this field will be empty and instead the relevant beta attributes
+    will be directly included in the `BetaTaskRunJsonOutput` or corresponding output
+    type. However, if beta features were specified during task run creation but not
+    during result retrieval, this field will contain the dump of fields from those
+    beta features. Each key represents the beta feature version (one amongst
+    parallel-beta headers) and the values correspond to the beta feature attributes,
+    if any. For now, only MCP server beta features have attributes. For example,
+    `{mcp-server-2025-07-17: [{'server_name':'mcp_server', 'tool_call_id': 'tc_123', ...}]}}`
+    """
+    output_schema: Optional[Dict[str, object]] = None
+    """Output schema for the Task Run.
+
+    Populated only if the task was executed with an auto schema.
+    """
+
+TaskRunResultOutput: TypeAlias = Annotated[Union[TaskRunTextOutput, TaskRunJsonOutput], Any]
+
+class TaskRunResult(BaseModel):
+    output: TaskRunResultOutput
+    """Output from the task conforming to the output schema."""
+    run: TaskRun
+    """Status of a task run."""
+
+# Parsed task run result (SDK helper)
+ContentType = TypeVar("ContentType", bound=pydantic.BaseModel)
+
+class ParsedTaskRunTextOutput(TaskRunTextOutput, Generic[ContentType]):
+    parsed: None
+    """The parsed output from the task run."""
+
+class ParsedTaskRunJsonOutput(TaskRunJsonOutput, Generic[ContentType]):
+    parsed: Optional[ContentType] = None
+    """The parsed output from the task run."""
+
+class ParsedTaskRunResult(TaskRunResult, Generic[ContentType]):
+    output: Union[ParsedTaskRunTextOutput[ContentType], ParsedTaskRunJsonOutput[ContentType]]
+    """The parsed output from the task run."""
+
+# Params
 class SourcePolicy(TypedDict, total=False):
     exclude_domains: Sequence[str]
+    """List of domains to exclude from results.
+
+    If specified, sources from these domains will be excluded. Accepts plain domains
+    (e.g., example.com, subdomain.example.gov) or bare domain extension starting
+    with a period (e.g., .gov, .edu, .co.uk).
+    """
     include_domains: Sequence[str]
+    """List of domains to restrict the results to.
+
+    If specified, only sources from these domains will be included. Accepts plain
+    domains (e.g., example.com, subdomain.example.gov) or bare domain extension
+    starting with a period (e.g., .gov, .edu, .co.uk).
+    """
 
 class TaskRunCreateParams(TypedDict, total=False):
-    input: Required[Union[str, Dict[str, object]]]
-    processor: Required[str]
+    input: Union[str, Dict[str, object]]
+    """Input to the task, either text or a JSON object."""
+    processor: str
+    """Processor to use for the task."""
     metadata: Optional[Dict[str, Union[str, float, bool]]]
+    """User-provided metadata stored with the run.
+
+    Keys and values must be strings with a maximum length of 16 and 512 characters
+    respectively.
+    """
     source_policy: Optional[SourcePolicy]
+    """Source policy for web search results.
+
+    This policy governs which sources are allowed/disallowed in results.
+    """
     task_spec: Optional[TaskSpecParam]
+    """Specification for a task.
+
+    Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
+    Not specifying a TaskSpec is the same as setting an auto output schema.
+
+    For convenience bare strings are also accepted as input or output schemas.
+    """
 
 class TaskRunResultParams(TypedDict, total=False):
-    api_timeout: Annotated[int, object]  # alias "timeout" at runtime
+    api_timeout: Annotated[int, Any]  # alias "timeout" in runtime
 
+# -----------------------------
+# SSE streaming helpers (publicly exported)
+# -----------------------------
 
-# -----------------------------------------------------------------------------
-# Beta types/models
-# -----------------------------------------------------------------------------
+_T = TypeVar("_T")
 
-ParallelBetaParam: TypeAlias = Union[
-    Literal[
-        "mcp-server-2025-07-17",
-        "events-sse-2025-07-24",
-        "webhook-2025-08-12",
-        "findall-2025-09-15",
-        "search-extract-2025-10-10",
-    ],
-    str,
-]
+class Stream(Iterator[_T], Generic[_T]): ...
+class AsyncStream(Generic[_T]):
+    def __aiter__(self) -> Any: ...
+    def __anext__(self) -> Any: ...
 
-class UsageItem(BaseModel):
-    count: int
-    name: str
-
-class Webhook(BaseModel):
-    url: str
-    event_types: Optional[List[Literal["task_run.status"]]]
-
-class WebhookParam(TypedDict, total=False):
-    url: Required[str]
-    event_types: List[Literal["task_run.status"]]
-
-class McpServer(BaseModel):
-    name: str
-    url: str
-    allowed_tools: Optional[List[str]]
-    headers: Optional[Dict[str, str]]
-    type: Optional[Literal["url"]]
-
-class McpServerParam(TypedDict, total=False):
-    name: Required[str]
-    url: Required[str]
-    allowed_tools: Optional[Sequence[str]]
-    headers: Optional[Dict[str, str]]
-    type: Literal["url"]
-
-class McpToolCall(BaseModel):
-    arguments: str
-    server_name: str
-    tool_call_id: str
-    tool_name: str
-    content: Optional[str]
-    error: Optional[str]
-
-# Beta "task run input" snapshot type (as returned in events)
-class BetaRunInput(BaseModel):
-    input: Union[str, Dict[str, object]]
-    processor: str
-    enable_events: Optional[bool]
-    mcp_servers: Optional[List[McpServer]]
-    metadata: Optional[Dict[str, Union[str, float, bool]]]
-    source_policy: Optional["types.shared.source_policy.SourcePolicy"]  # left as string-ish reference
-    task_spec: Optional[TaskSpec]
-    webhook: Optional[Webhook]
-
-class BetaRunInputParam(TypedDict, total=False):
-    input: Required[Union[str, Dict[str, object]]]
-    processor: Required[str]
-    enable_events: Optional[bool]
-    mcp_servers: Optional[Iterable[McpServerParam]]
-    metadata: Optional[Dict[str, Union[str, float, bool]]]
-    source_policy: Optional[SourcePolicy]
-    task_spec: Optional[TaskSpecParam]
-    webhook: Optional[WebhookParam]
-
-# Beta TaskRunCreate/Result params
-class BetaTaskRunCreateParams(TypedDict, total=False):
-    input: Required[Union[str, Dict[str, object]]]
-    processor: Required[str]
-    enable_events: Optional[bool]
-    mcp_servers: Optional[Iterable[McpServerParam]]
-    metadata: Optional[Dict[str, Union[str, float, bool]]]
-    source_policy: Optional[SourcePolicy]
-    task_spec: Optional[TaskSpecParam]
-    webhook: Optional[WebhookParam]
-    betas: Annotated[List[ParallelBetaParam], object]  # alias "parallel-beta"
-
-class BetaTaskRunResultParams(TypedDict, total=False):
-    api_timeout: Annotated[int, object]  # alias "timeout"
-    betas: Annotated[List[ParallelBetaParam], object]  # alias "parallel-beta"
-
-# Search/Extract
-class ExcerptSettingsParam(TypedDict, total=False):
-    max_chars_per_result: Optional[int]
-
-class FetchPolicyParam(TypedDict, total=False):
-    disable_cache_fallback: bool
-    max_age_seconds: Optional[int]
-    timeout_seconds: Optional[float]
-
-BetaExtractExcerpts: TypeAlias = Union[bool, ExcerptSettingsParam]
-class FullContentFullContentSettings(TypedDict, total=False):
-    max_chars_per_result: Optional[int]
-BetaExtractFullContent: TypeAlias = Union[bool, FullContentFullContentSettings]
-
-class BetaExtractParams(TypedDict, total=False):
-    urls: Required[Sequence[str]]
-    excerpts: BetaExtractExcerpts
-    fetch_policy: Optional[FetchPolicyParam]
-    full_content: BetaExtractFullContent
-    objective: Optional[str]
-    search_queries: Optional[Sequence[str]]
-    betas: Annotated[List[ParallelBetaParam], object]  # alias "parallel-beta"
-
-class BetaSearchParams(TypedDict, total=False):
-    excerpts: ExcerptSettingsParam
-    fetch_policy: Optional[FetchPolicyParam]
-    max_chars_per_result: Optional[int]
-    max_results: Optional[int]
-    mode: Optional[Literal["one-shot", "agentic"]]
-    objective: Optional[str]
-    processor: Optional[Literal["base", "pro"]]
-    search_queries: Optional[Sequence[str]]
-    source_policy: Optional[SourcePolicy]
-    betas: Annotated[List[ParallelBetaParam], object]  # alias "parallel-beta"
-
-class WebSearchResult(BaseModel):
-    url: str
-    excerpts: Optional[List[str]]
-    publish_date: Optional[str]
-    title: Optional[str]
-
-class SearchResult(BaseModel):
-    results: List[WebSearchResult]
-    search_id: str
-    usage: Optional[List[UsageItem]]
-    warnings: Optional[List[Warning]]
-
-class ExtractError(BaseModel):
-    content: Optional[str]
-    error_type: str
-    http_status_code: Optional[int]
-    url: str
-
-class ExtractResult(BaseModel):
-    url: str
-    excerpts: Optional[List[str]]
-    full_content: Optional[str]
-    publish_date: Optional[str]
-    title: Optional[str]
-
-class ExtractResponse(BaseModel):
-    errors: List[ExtractError]
-    extract_id: str
-    results: List[ExtractResult]
-    usage: Optional[List[UsageItem]]
-    warnings: Optional[List[Warning]]
-
-# Beta task run result includes MCP tool calls surfaced directly
-class BetaTaskRunTextOutput(BaseModel):
-    basis: List[FieldBasis]
-    content: str
-    type: Literal["text"]
-    beta_fields: Optional[Dict[str, object]]
-    mcp_tool_calls: Optional[List[McpToolCall]]
-
-class BetaTaskRunJsonOutput(BaseModel):
-    basis: List[FieldBasis]
-    content: Dict[str, object]
-    type: Literal["json"]
-    beta_fields: Optional[Dict[str, object]]
-    mcp_tool_calls: Optional[List[McpToolCall]]
-    output_schema: Optional[Dict[str, object]]
-
-BetaTaskRunOutput: TypeAlias = Annotated[Union[BetaTaskRunTextOutput, BetaTaskRunJsonOutput], object]
-
-class BetaTaskRunResult(BaseModel):
-    output: BetaTaskRunOutput
-    run: TaskRun
-
-# SSE events for task runs (beta)
-class ErrorEvent(BaseModel):
-    error: ErrorObject
-    type: Literal["error"]
-
-class TaskRunEvent(BaseModel):
-    event_id: Optional[str]
-    run: TaskRun
-    type: Literal["task_run.state"]
-    input: Optional[BetaRunInput]
-    output: Optional[Annotated[Union[TaskRunTextOutput, TaskRunJsonOutput, None], object]]
-
-class TaskRunProgressStatsEventSourceStats(BaseModel):
-    num_sources_considered: Optional[int]
-    num_sources_read: Optional[int]
-    sources_read_sample: Optional[List[str]]
-
-class TaskRunProgressStatsEvent(BaseModel):
-    progress_meter: float
-    source_stats: TaskRunProgressStatsEventSourceStats
-    type: Literal["task_run.progress_stats"]
-
-class TaskRunProgressMessageEvent(BaseModel):
-    message: str
-    timestamp: Optional[str]
-    type: Literal[
-        "task_run.progress_msg.plan",
-        "task_run.progress_msg.search",
-        "task_run.progress_msg.result",
-        "task_run.progress_msg.tool_call",
-        "task_run.progress_msg.exec_status",
-    ]
-
-TaskRunEventsResponse: TypeAlias = Annotated[
-    Union[TaskRunProgressStatsEvent, TaskRunProgressMessageEvent, TaskRunEvent, ErrorEvent],
-    object,
-]
-
-# TaskGroup (beta)
-class TaskGroupStatus(BaseModel):
-    is_active: bool
-    modified_at: Optional[str]
-    num_task_runs: int
-    status_message: Optional[str]
-    task_run_status_counts: Dict[str, int]
-
-class TaskGroup(BaseModel):
-    created_at: Optional[str]
-    status: TaskGroupStatus
-    task_group_id: str
-    metadata: Optional[Dict[str, Union[str, float, bool]]]
-
-class TaskGroupCreateParams(TypedDict, total=False):
-    metadata: Optional[Dict[str, Union[str, float, bool]]]
-
-class TaskGroupAddRunsParams(TypedDict, total=False):
-    inputs: Required[Iterable[BetaRunInputParam]]
-    default_task_spec: Optional[TaskSpecParam]
-    betas: Annotated[List[ParallelBetaParam], object]  # alias "parallel-beta"
-
-class TaskGroupEventsParams(TypedDict, total=False):
-    last_event_id: Optional[str]
-    api_timeout: Annotated[Optional[float], object]  # alias "timeout"
-
-class TaskGroupGetRunsParams(TypedDict, total=False):
-    include_input: bool
-    include_output: bool
-    last_event_id: Optional[str]
-    status: Optional[Literal["queued", "action_required", "running", "completed", "failed", "cancelling", "cancelled"]]
-
-class TaskGroupStatusEvent(BaseModel):
-    event_id: str
-    status: TaskGroupStatus
-    type: Literal["task_group_status"]
-
-TaskGroupEventsResponse: TypeAlias = Annotated[Union[TaskGroupStatusEvent, TaskRunEvent, ErrorEvent], object]
-TaskGroupGetRunsResponse: TypeAlias = Annotated[Union[TaskRunEvent, ErrorEvent], object]
-
-class TaskGroupRunResponse(BaseModel):
-    event_cursor: Optional[str]
-    run_cursor: Optional[str]
-    run_ids: List[str]
-    status: TaskGroupStatus
-
-# FindAll (beta)
-class FindallSchemaMatchCondition(BaseModel):
-    description: str
-    name: str
-
-class FindallEnrichInput(BaseModel):
-    output_schema: JsonSchema
-    mcp_servers: Optional[List[McpServer]]
-    processor: Optional[str]
-
-class FindallSchema(BaseModel):
-    entity_type: str
-    match_conditions: List[FindallSchemaMatchCondition]
-    objective: str
-    enrichments: Optional[List[FindallEnrichInput]]
-    generator: Optional[Literal["base", "core", "pro", "preview"]]
-    match_limit: Optional[int]
-
-class FindallIngestParams(TypedDict, total=False):
-    objective: Required[str]
-    betas: Annotated[List[ParallelBetaParam], object]  # alias "parallel-beta"
-
-class FindallCreateMatchCondition(TypedDict, total=False):
-    description: Required[str]
-    name: Required[str]
-
-class FindallCreateExcludeList(TypedDict, total=False):
-    name: Required[str]
-    url: Required[str]
-
-class FindallCreateParams(TypedDict, total=False):
-    entity_type: Required[str]
-    generator: Required[Literal["base", "core", "pro", "preview"]]
-    match_conditions: Required[Iterable[FindallCreateMatchCondition]]
-    match_limit: Required[int]
-    objective: Required[str]
-    exclude_list: Optional[Iterable[FindallCreateExcludeList]]
-    metadata: Optional[Dict[str, Union[str, float, bool]]]
-    webhook: Optional[WebhookParam]
-    betas: Annotated[List[ParallelBetaParam], object]  # alias "parallel-beta"
-
-class FindallExtendParams(TypedDict, total=False):
-    additional_match_limit: Required[int]
-    betas: Annotated[List[ParallelBetaParam], object]  # alias "parallel-beta"
-
-class FindallEnrichParams(TypedDict, total=False):
-    output_schema: Required[JsonSchemaParam]
-    mcp_servers: Optional[Iterable[McpServerParam]]
-    processor: str
-    betas: Annotated[List[ParallelBetaParam], object]  # alias "parallel-beta"
-
-class FindallEventsParams(TypedDict, total=False):
-    last_event_id: Optional[str]
-    api_timeout: Annotated[Optional[float], object]  # alias "timeout"
-    betas: Annotated[List[ParallelBetaParam], object]  # alias "parallel-beta"
-
-class FindallRunStatusMetrics(BaseModel):
-    generated_candidates_count: Optional[int]
-    matched_candidates_count: Optional[int]
-
-class FindallRunStatus(BaseModel):
-    is_active: bool
-    metrics: FindallRunStatusMetrics
-    status: Literal["queued", "action_required", "running", "completed", "failed", "cancelling", "cancelled"]
-    termination_reason: Optional[str]
-
-class FindallRun(BaseModel):
-    findall_id: str
-    generator: Literal["base", "core", "pro", "preview"]
-    status: FindallRunStatus
-    created_at: Optional[str]
-    metadata: Optional[Dict[str, Union[str, float, bool]]]
-    modified_at: Optional[str]
-
-class FindallRunStatusEvent(BaseModel):
-    data: FindallRun
-    event_id: str
-    timestamp: datetime
-    type: Literal["findall.status"]
-
-class FindallSchemaUpdatedEvent(BaseModel):
-    data: FindallSchema
-    event_id: str
-    timestamp: datetime
-    type: Literal["findall.schema.updated"]
-
-class FindallCandidateMatchStatusEventData(BaseModel):
-    candidate_id: str
-    match_status: Literal["generated", "matched", "unmatched", "discarded"]
-    name: str
-    url: str
-    basis: Optional[List[FieldBasis]]
-    description: Optional[str]
-    output: Optional[Dict[str, object]]
-
-class FindallCandidateMatchStatusEvent(BaseModel):
-    data: FindallCandidateMatchStatusEventData
-    event_id: str
-    timestamp: datetime
-    type: Literal[
-        "findall.candidate.generated",
-        "findall.candidate.matched",
-        "findall.candidate.unmatched",
-        "findall.candidate.discarded",
-        "findall.candidate.enriched",
-    ]
-
-FindallEventsResponse: TypeAlias = Annotated[
-    Union[FindallSchemaUpdatedEvent, FindallRunStatusEvent, FindallCandidateMatchStatusEvent, ErrorEvent],
-    object,
-]
-
-class FindallRunResultCandidate(BaseModel):
-    candidate_id: str
-    match_status: Literal["generated", "matched", "unmatched", "discarded"]
-    name: str
-    url: str
-    basis: Optional[List[FieldBasis]]
-    description: Optional[str]
-    output: Optional[Dict[str, object]]
-
-class FindallRunResult(BaseModel):
-    candidates: List[FindallRunResultCandidate]
-    run: FindallRun
-    last_event_id: Optional[str]
-
-# The retrieve endpoint is a union of two shapes; keep as object union summary
-class FindAllPollResponse(BaseModel): ...
-FindallRetrieveResponse: TypeAlias = Union[FindallRun, FindAllPollResponse]
-
-
-# -----------------------------------------------------------------------------
-# Resources
-# -----------------------------------------------------------------------------
-
-# ---- Non-beta TaskRun resource ----
+# -----------------------------
+# Resources: task_run (stable)
+# -----------------------------
 
 class TaskRunResource:
-    @property
-    def with_raw_response(self) -> TaskRunResourceWithRawResponse: ...
-    @property
-    def with_streaming_response(self) -> TaskRunResourceWithStreamingResponse: ...
-
     def create(
         self,
         *,
@@ -908,7 +579,7 @@ class TaskRunResource:
         input: Union[str, Dict[str, object]],
         processor: str,
         metadata: Optional[Dict[str, Union[str, float, bool]]] | Omit = ...,
-        output: Optional[OutputSchema] | Omit = ...,
+        output: Optional[OutputSchemaParam] | Omit = ...,
         extra_headers: Headers | None = ...,
         extra_query: Query | None = ...,
         extra_body: Body | None = ...,
@@ -935,7 +606,7 @@ class TaskRunResource:
         input: Union[str, Dict[str, object]],
         processor: str,
         metadata: Optional[Dict[str, Union[str, float, bool]]] | Omit = ...,
-        output: Optional[OutputSchema] | Type[OutputT] | Omit = ...,
+        output: Optional[OutputSchemaParam] | Type[OutputT] | Omit = ...,
         extra_headers: Headers | None = ...,
         extra_query: Query | None = ...,
         extra_body: Body | None = ...,
@@ -974,13 +645,7 @@ class TaskRunResource:
             If the result is not available within the timeout, a `TimeoutError` is raised.
         """
 
-
 class AsyncTaskRunResource:
-    @property
-    def with_raw_response(self) -> AsyncTaskRunResourceWithRawResponse: ...
-    @property
-    def with_streaming_response(self) -> AsyncTaskRunResourceWithStreamingResponse: ...
-
     async def create(
         self,
         *,
@@ -1023,7 +688,7 @@ class AsyncTaskRunResource:
         input: Union[str, Dict[str, object]],
         processor: str,
         metadata: Optional[Dict[str, Union[str, float, bool]]] | Omit = ...,
-        output: Optional[OutputSchema] | Omit = ...,
+        output: Optional[OutputSchemaParam] | Omit = ...,
         extra_headers: Headers | None = ...,
         extra_query: Query | None = ...,
         extra_body: Body | None = ...,
@@ -1050,22 +715,369 @@ class AsyncTaskRunResource:
         input: Union[str, Dict[str, object]],
         processor: str,
         metadata: Optional[Dict[str, Union[str, float, bool]]] | Omit = ...,
-        output: Optional[OutputSchema] | Type[OutputT] | Omit = ...,
+        output: Optional[OutputSchemaParam] | Type[OutputT] | Omit = ...,
         extra_headers: Headers | None = ...,
         extra_query: Query | None = ...,
         extra_body: Body | None = ...,
         timeout: float | httpx.Timeout | None | NotGiven = ...,
     ) -> Union[TaskRunResult, ParsedTaskRunResult[OutputT]]: ...
 
+# Raw/streaming wrappers exist for most resources (surface-level)
+class TaskRunResourceWithRawResponse: ...
+class AsyncTaskRunResourceWithRawResponse: ...
+class TaskRunResourceWithStreamingResponse: ...
+class AsyncTaskRunResourceWithStreamingResponse: ...
 
-# ---- Beta resources (search/extract + beta.task_run/task_group/findall) ----
+# -----------------------------
+# Beta API (headers-based "parallel-beta")
+# -----------------------------
+
+ParallelBetaParam: TypeAlias = Union[
+    Literal[
+        "mcp-server-2025-07-17",
+        "events-sse-2025-07-24",
+        "webhook-2025-08-12",
+        "findall-2025-09-15",
+        "search-extract-2025-10-10",
+    ],
+    str,
+]
+
+# Beta: MCP
+class McpServer(BaseModel):
+    name: str
+    """Name of the MCP server."""
+    url: str
+    """URL of the MCP server."""
+    allowed_tools: Optional[List[str]] = None
+    """List of allowed tools for the MCP server."""
+    headers: Optional[Dict[str, str]] = None
+    """Headers for the MCP server."""
+    type: Optional[Literal["url"]] = None
+    """Type of MCP server being configured. Always `url`."""
+
+class McpToolCall(BaseModel):
+    arguments: str
+    """Arguments used to call the MCP tool."""
+    server_name: str
+    """Name of the MCP server."""
+    tool_call_id: str
+    """Identifier for the tool call."""
+    tool_name: str
+    """Name of the tool being called."""
+    content: Optional[str] = None
+    """Output received from the tool call, if successful."""
+    error: Optional[str] = None
+    """Error message if the tool call failed."""
+
+class McpServerParam(TypedDict, total=False):
+    name: str
+    """Name of the MCP server."""
+    url: str
+    """URL of the MCP server."""
+    allowed_tools: Optional[Sequence[str]]
+    """List of allowed tools for the MCP server."""
+    headers: Optional[Dict[str, str]]
+    """Headers for the MCP server."""
+    type: Literal["url"]
+    """Type of MCP server being configured. Always `url`."""
+
+# Beta: webhook
+class Webhook(BaseModel):
+    url: str
+    """URL for the webhook."""
+    event_types: Optional[List[Literal["task_run.status"]]] = None
+    """Event types to send the webhook notifications for."""
+
+class WebhookParam(TypedDict, total=False):
+    url: str
+    """URL for the webhook."""
+    event_types: List[Literal["task_run.status"]]
+    """Event types to send the webhook notifications for."""
+
+# Beta: TaskRun events stream
+class TaskRunProgressStatsEventSourceStats(BaseModel):
+    num_sources_considered: Optional[int] = None
+    """Number of sources considered in processing the task."""
+    num_sources_read: Optional[int] = None
+    """Number of sources read in processing the task."""
+    sources_read_sample: Optional[List[str]] = None
+    """A sample of URLs of sources read in processing the task."""
+
+class TaskRunProgressStatsEvent(BaseModel):
+    progress_meter: float
+    """Completion percentage of the task run.
+
+    Ranges from 0 to 100 where 0 indicates no progress and 100 indicates completion.
+    """
+    source_stats: TaskRunProgressStatsEventSourceStats
+    """Source stats for a task run."""
+    type: Literal["task_run.progress_stats"]
+    """Event type; always 'task_run.progress_stats'."""
+
+class TaskRunProgressMessageEvent(BaseModel):
+    message: str
+    """Progress update message."""
+    timestamp: Optional[str] = None
+    """Timestamp of the message."""
+    type: Literal[
+        "task_run.progress_msg.plan",
+        "task_run.progress_msg.search",
+        "task_run.progress_msg.result",
+        "task_run.progress_msg.tool_call",
+        "task_run.progress_msg.exec_status",
+    ]
+    """Event type; always starts with 'task_run.progress_msg'."""
+
+class ErrorEvent(BaseModel):
+    error: ErrorObject
+    """An error message."""
+    type: Literal["error"]
+    """Event type; always 'error'."""
+
+# BetaRunInput
+class BetaRunInput(BaseModel):
+    input: Union[str, Dict[str, object]]
+    """Input to the task, either text or a JSON object."""
+    processor: str
+    """Processor to use for the task."""
+    enable_events: Optional[bool] = None
+    """Controls tracking of task run execution progress.
+
+    When set to true, progress events are recorded and can be accessed via the
+    [Task Run events](https://platform.parallel.ai/api-reference) endpoint. When
+    false, no progress events are tracked. Note that progress tracking cannot be
+    enabled after a run has been created. The flag is set to true by default for
+    premium processors (pro and above). To enable this feature in your requests,
+    specify `events-sse-2025-07-24` as one of the values in `parallel-beta` header
+    (for API calls) or `betas` param (for the SDKs).
+    """
+    mcp_servers: Optional[List[McpServer]] = None
+    """
+    Optional list of MCP servers to use for the run. To enable this feature in your
+    requests, specify `mcp-server-2025-07-17` as one of the values in
+    `parallel-beta` header (for API calls) or `betas` param (for the SDKs).
+    """
+    metadata: Optional[Dict[str, Union[str, float, bool]]] = None
+    """User-provided metadata stored with the run.
+
+    Keys and values must be strings with a maximum length of 16 and 512 characters
+    respectively.
+    """
+    source_policy: Optional["BetaSourcePolicyModel"] = None
+    task_spec: Optional[TaskSpec] = None
+    webhook: Optional[Webhook] = None
+    """Webhooks for Task Runs."""
+
+# SourcePolicy model (beta uses BaseModel version)
+class BetaSourcePolicyModel(BaseModel):
+    exclude_domains: Optional[List[str]] = None
+    """List of domains to exclude from results.
+
+    If specified, sources from these domains will be excluded. Accepts plain domains
+    (e.g., example.com, subdomain.example.gov) or bare domain extension starting
+    with a period (e.g., .gov, .edu, .co.uk).
+    """
+    include_domains: Optional[List[str]] = None
+    """List of domains to restrict the results to.
+
+    If specified, only sources from these domains will be included. Accepts plain
+    domains (e.g., example.com, subdomain.example.gov) or bare domain extension
+    starting with a period (e.g., .gov, .edu, .co.uk).
+    """
+
+# Beta: task run result w/ MCP tool calls
+class OutputBetaTaskRunTextOutput(BaseModel):
+    basis: List[FieldBasis]
+    """Basis for the output."""
+    content: str
+    """Text output from the task."""
+    type: Literal["text"]
+    """
+    The type of output being returned, as determined by the output schema of the
+    task spec.
+    """
+    beta_fields: Optional[Dict[str, object]] = None
+    """Always None."""
+    mcp_tool_calls: Optional[List[McpToolCall]] = None
+    """MCP tool calls made by the task."""
+
+class OutputBetaTaskRunJsonOutput(BaseModel):
+    basis: List[FieldBasis]
+    """Basis for the output."""
+    content: Dict[str, object]
+    """
+    Output from the task as a native JSON object, as determined by the output schema
+    of the task spec.
+    """
+    type: Literal["json"]
+    """
+    The type of output being returned, as determined by the output schema of the
+    task spec.
+    """
+    beta_fields: Optional[Dict[str, object]] = None
+    """Always None."""
+    mcp_tool_calls: Optional[List[McpToolCall]] = None
+    """MCP tool calls made by the task."""
+    output_schema: Optional[Dict[str, object]] = None
+    """Output schema for the Task Run.
+
+    Populated only if the task was executed with an auto schema.
+    """
+
+BetaTaskRunResultOutput: TypeAlias = Annotated[Union[OutputBetaTaskRunTextOutput, OutputBetaTaskRunJsonOutput], Any]
+
+class BetaTaskRunResult(BaseModel):
+    output: BetaTaskRunResultOutput
+    """Output from the task conforming to the output schema."""
+    run: TaskRun
+    """Status of a task run."""
+
+# Beta: Search/Extract
+class UsageItem(BaseModel):
+    count: int
+    """Count of the SKU."""
+    name: str
+    """Name of the SKU."""
+
+class WebSearchResult(BaseModel):
+    url: str
+    """URL associated with the search result."""
+    excerpts: Optional[List[str]] = None
+    """Relevant excerpted content from the URL, formatted as markdown."""
+    publish_date: Optional[str] = None
+    """Publish date of the webpage in YYYY-MM-DD format, if available."""
+    title: Optional[str] = None
+    """Title of the webpage, if available."""
+
+class SearchResult(BaseModel):
+    results: List[WebSearchResult]
+    """A list of WebSearchResult objects, ordered by decreasing relevance."""
+    search_id: str
+    """Search ID. Example: `search_cad0a6d2dec046bd95ae900527d880e7`"""
+    usage: Optional[List[UsageItem]] = None
+    """Usage metrics for the search request."""
+    warnings: Optional[List[Warning]] = None
+    """Warnings for the search request, if any."""
+
+class ExtractError(BaseModel):
+    content: Optional[str] = None
+    """Content returned for http client or server errors, if any."""
+    error_type: str
+    """Error type."""
+    http_status_code: Optional[int] = None
+    """HTTP status code, if available."""
+    url: str
+
+class ExtractResult(BaseModel):
+    url: str
+    """URL associated with the search result."""
+    excerpts: Optional[List[str]] = None
+    """Relevant excerpted content from the URL, formatted as markdown."""
+    full_content: Optional[str] = None
+    """Full content from the URL formatted as markdown, if requested."""
+    publish_date: Optional[str] = None
+    """Publish date of the webpage in YYYY-MM-DD format, if available."""
+    title: Optional[str] = None
+    """Title of the webpage, if available."""
+
+class ExtractResponse(BaseModel):
+    errors: List[ExtractError]
+    """Extract errors: requested URLs not in the results."""
+    extract_id: str
+    """Extract request ID, e.g. `extract_cad0a6d2dec046bd95ae900527d880e7`"""
+    results: List[ExtractResult]
+    """Successful extract results."""
+    usage: Optional[List[UsageItem]] = None
+    """Usage metrics for the extract request."""
+    warnings: Optional[List[Warning]] = None
+    """Warnings for the extract request, if any."""
+
+class FetchPolicyParam(TypedDict, total=False):
+    disable_cache_fallback: bool
+    """
+    If false, fallback to cached content older than max-age if live fetch fails or
+    times out. If true, returns an error instead.
+    """
+    max_age_seconds: Optional[int]
+    """Maximum age of cached content in seconds to trigger a live fetch.
+
+    Minimum value 600 seconds (10 minutes).
+    """
+    timeout_seconds: Optional[float]
+    """Timeout in seconds for fetching live content if unavailable in cache."""
+
+class ExcerptSettingsParam(TypedDict, total=False):
+    max_chars_per_result: Optional[int]
+    """Optional upper bound on the total number of characters to include per url.
+
+    Excerpts may contain fewer characters than this limit to maximize relevance and
+    token efficiency.
+    """
+
+class BetaSearchParams(TypedDict, total=False):
+    excerpts: ExcerptSettingsParam
+    """Optional settings for returning relevant excerpts."""
+    fetch_policy: Optional[FetchPolicyParam]
+    """Policy for live fetching web results."""
+    max_chars_per_result: Optional[int]
+    """DEPRECATED: Use `excerpts.max_chars_per_result` instead."""
+    max_results: Optional[int]
+    """Upper bound on the number of results to return.
+
+    May be limited by the processor. Defaults to 10 if not provided.
+    """
+    mode: Optional[Literal["one-shot", "agentic"]]
+    """Presets default values for parameters for different use cases.
+
+    `one-shot` returns more comprehensive results and longer excerpts to answer
+    questions from a single response, while `agentic` returns more concise,
+    token-efficient results for use in an agentic loop.
+    """
+    objective: Optional[str]
+    """Natural-language description of what the web search is trying to find.
+
+    May include guidance about preferred sources or freshness. At least one of
+    objective or search_queries must be provided.
+    """
+    processor: Optional[Literal["base", "pro"]]
+    """DEPRECATED: use `mode` instead."""
+    search_queries: Optional[Sequence[str]]
+    """Optional list of traditional keyword search queries to guide the search.
+
+    May contain search operators. At least one of objective or search_queries must
+    be provided.
+    """
+    source_policy: Optional[SourcePolicy]
+    """Source policy for web search results.
+
+    This policy governs which sources are allowed/disallowed in results.
+    """
+    betas: Annotated[List[ParallelBetaParam], Any]
+    """Optional header to specify the beta version(s) to enable."""
+
+# FindAll (beta)
+class FindallRun(BaseModel): ...
+class FindallSchema(BaseModel): ...
+class FindallRunResult(BaseModel): ...
+class FindallRetrieveResponse(BaseModel): ...
+class FindallEventsResponse(BaseModel): ...
+
+# -----------------------------
+# Beta Resources
+# -----------------------------
+
+TaskRunEventsResponse: TypeAlias = Annotated[
+    Union[TaskRunProgressStatsEvent, TaskRunProgressMessageEvent, "BetaTaskRunEvent", ErrorEvent],
+    Any,
+]
+
+class BetaTaskRunEvent(BaseModel): ...
+
+class BetaTaskRunCreateParams(TypedDict, total=False): ...
+class BetaTaskRunResultParams(TypedDict, total=False): ...
 
 class BetaTaskRunResource:
-    @property
-    def with_raw_response(self) -> BetaTaskRunResourceWithRawResponse: ...
-    @property
-    def with_streaming_response(self) -> BetaTaskRunResourceWithStreamingResponse: ...
-
     def create(
         self,
         *,
@@ -1190,90 +1202,35 @@ class BetaTaskRunResource:
         """
 
 class AsyncBetaTaskRunResource:
-    @property
-    def with_raw_response(self) -> AsyncBetaTaskRunResourceWithRawResponse: ...
-    @property
-    def with_streaming_response(self) -> AsyncBetaTaskRunResourceWithStreamingResponse: ...
     async def create(self, **kwargs: Any) -> TaskRun: ...
     async def events(self, run_id: str, **kwargs: Any) -> AsyncStream[TaskRunEventsResponse]: ...
     async def result(self, run_id: str, **kwargs: Any) -> BetaTaskRunResult: ...
 
+# Beta: TaskGroup + FindAll resources exist; included as opaque footprints
+class TaskGroup(BaseModel): ...
+class TaskGroupStatus(BaseModel): ...
+class TaskGroupRunResponse(BaseModel): ...
+class TaskGroupEventsResponse(BaseModel): ...
+class TaskGroupGetRunsResponse(BaseModel): ...
 
-class BetaTaskGroupResource:
-    @property
-    def with_raw_response(self) -> BetaTaskGroupResourceWithRawResponse: ...
-    @property
-    def with_streaming_response(self) -> BetaTaskGroupResourceWithStreamingResponse: ...
+class BetaTaskGroupResource: ...
+class AsyncBetaTaskGroupResource: ...
 
-    def create(self, *, metadata: Optional[Dict[str, Union[str, float, bool]]] | Omit = ..., **kwargs: Any) -> TaskGroup: ...
-    def retrieve(self, task_group_id: str, **kwargs: Any) -> TaskGroup: ...
-    def add_runs(self, task_group_id: str, *, inputs: Iterable[BetaRunInputParam], default_task_spec: Optional[TaskSpecParam] | Omit = ..., betas: List[ParallelBetaParam] | Omit = ..., **kwargs: Any) -> TaskGroupRunResponse: ...
-    def events(self, task_group_id: str, *, last_event_id: Optional[str] | Omit = ..., api_timeout: Optional[float] | Omit = ..., **kwargs: Any) -> Stream[TaskGroupEventsResponse]: ...
-    def get_runs(self, task_group_id: str, *, include_input: bool | Omit = ..., include_output: bool | Omit = ..., last_event_id: Optional[str] | Omit = ..., status: Optional[Literal["queued","action_required","running","completed","failed","cancelling","cancelled"]] | Omit = ..., **kwargs: Any) -> Stream[TaskGroupGetRunsResponse]: ...
-
-class AsyncBetaTaskGroupResource:
-    @property
-    def with_raw_response(self) -> AsyncBetaTaskGroupResourceWithRawResponse: ...
-    @property
-    def with_streaming_response(self) -> AsyncBetaTaskGroupResourceWithStreamingResponse: ...
-    async def create(self, **kwargs: Any) -> TaskGroup: ...
-    async def retrieve(self, task_group_id: str, **kwargs: Any) -> TaskGroup: ...
-    async def add_runs(self, task_group_id: str, **kwargs: Any) -> TaskGroupRunResponse: ...
-    async def events(self, task_group_id: str, **kwargs: Any) -> AsyncStream[TaskGroupEventsResponse]: ...
-    async def get_runs(self, task_group_id: str, **kwargs: Any) -> AsyncStream[TaskGroupGetRunsResponse]: ...
-
-
-class BetaFindallResource:
-    @property
-    def with_raw_response(self) -> BetaFindallResourceWithRawResponse: ...
-    @property
-    def with_streaming_response(self) -> BetaFindallResourceWithStreamingResponse: ...
-    def create(self, **kwargs: Any) -> FindallRun: ...
-    def retrieve(self, findall_id: str, **kwargs: Any) -> FindallRetrieveResponse: ...
-    def cancel(self, findall_id: str, **kwargs: Any) -> object: ...
-    def enrich(self, findall_id: str, **kwargs: Any) -> FindallSchema: ...
-    def events(self, findall_id: str, **kwargs: Any) -> Stream[FindallEventsResponse]: ...
-    def extend(self, findall_id: str, **kwargs: Any) -> FindallSchema: ...
-    def ingest(self, **kwargs: Any) -> FindallSchema: ...
-    def result(self, findall_id: str, **kwargs: Any) -> FindallRunResult: ...
-    def schema(self, findall_id: str, **kwargs: Any) -> FindallSchema: ...
-
-class AsyncBetaFindallResource:
-    @property
-    def with_raw_response(self) -> AsyncBetaFindallResourceWithRawResponse: ...
-    @property
-    def with_streaming_response(self) -> AsyncBetaFindallResourceWithStreamingResponse: ...
-    async def create(self, **kwargs: Any) -> FindallRun: ...
-    async def retrieve(self, findall_id: str, **kwargs: Any) -> FindallRetrieveResponse: ...
-    async def cancel(self, findall_id: str, **kwargs: Any) -> object: ...
-    async def enrich(self, findall_id: str, **kwargs: Any) -> FindallSchema: ...
-    async def events(self, findall_id: str, **kwargs: Any) -> AsyncStream[FindallEventsResponse]: ...
-    async def extend(self, findall_id: str, **kwargs: Any) -> FindallSchema: ...
-    async def ingest(self, **kwargs: Any) -> FindallSchema: ...
-    async def result(self, findall_id: str, **kwargs: Any) -> FindallRunResult: ...
-    async def schema(self, findall_id: str, **kwargs: Any) -> FindallSchema: ...
-
+class BetaFindallResource: ...
+class AsyncBetaFindallResource: ...
 
 class BetaResource:
-    @property
-    def task_run(self) -> BetaTaskRunResource: ...
-    @property
-    def task_group(self) -> BetaTaskGroupResource: ...
-    @property
-    def findall(self) -> BetaFindallResource: ...
-
-    @property
-    def with_raw_response(self) -> BetaResourceWithRawResponse: ...
-    @property
-    def with_streaming_response(self) -> BetaResourceWithStreamingResponse: ...
+    task_run: BetaTaskRunResource
+    task_group: BetaTaskGroupResource
+    findall: BetaFindallResource
 
     def extract(
         self,
         *,
         urls: Sequence[str],
-        excerpts: BetaExtractExcerpts | Omit = ...,
+        excerpts: object | Omit = ...,
         fetch_policy: Optional[FetchPolicyParam] | Omit = ...,
-        full_content: BetaExtractFullContent | Omit = ...,
+        full_content: object | Omit = ...,
         objective: Optional[str] | Omit = ...,
         search_queries: Optional[Sequence[str]] | Omit = ...,
         betas: List[ParallelBetaParam] | Omit = ...,
@@ -1378,383 +1335,196 @@ class BetaResource:
         """
 
 class AsyncBetaResource:
-    @property
-    def task_run(self) -> AsyncBetaTaskRunResource: ...
-    @property
-    def task_group(self) -> AsyncBetaTaskGroupResource: ...
-    @property
-    def findall(self) -> AsyncBetaFindallResource: ...
-    @property
-    def with_raw_response(self) -> AsyncBetaResourceWithRawResponse: ...
-    @property
-    def with_streaming_response(self) -> AsyncBetaResourceWithStreamingResponse: ...
+    task_run: AsyncBetaTaskRunResource
+    task_group: AsyncBetaTaskGroupResource
+    findall: AsyncBetaFindallResource
     async def extract(self, **kwargs: Any) -> ExtractResponse: ...
     async def search(self, **kwargs: Any) -> SearchResult: ...
 
+# -----------------------------
+# API Response wrappers (publicly exported)
+# -----------------------------
 
-# -----------------------------------------------------------------------------
-# "with_raw_response" / "with_streaming_response" wrapper resource objects
-# -----------------------------------------------------------------------------
+R = TypeVar("R")
 
-# NOTE: These wrappers exist for: parallel.Parallel, parallel.AsyncParallel,
-# and for each resource. In the generated SDK, these wrappers return
-# APIResponse/AsyncAPIResponse or context managers for streamed responses.
+class APIResponse(Generic[R]):
+    http_response: httpx.Response
+    retries_taken: int
+    def parse(self, *, to: Type[Any] | None = None) -> Any: ...
+    def read(self) -> bytes: ...
+    def text(self) -> str: ...
+    def json(self) -> object: ...
+    def close(self) -> None: ...
+    def iter_bytes(self, chunk_size: int | None = None) -> Iterator[bytes]: ...
+    def iter_text(self, chunk_size: int | None = None) -> Iterator[str]: ...
+    def iter_lines(self) -> Iterator[str]: ...
 
-class TaskRunResourceWithRawResponse:
-    create: Any
-    retrieve: Any
-    result: Any
+class AsyncAPIResponse(Generic[R]):
+    http_response: httpx.Response
+    retries_taken: int
+    async def parse(self, *, to: Type[Any] | None = None) -> Any: ...
+    async def read(self) -> bytes: ...
+    async def text(self) -> str: ...
+    async def json(self) -> object: ...
+    async def close(self) -> None: ...
+    async def iter_bytes(self, chunk_size: int | None = None) -> Any: ...
+    async def iter_text(self, chunk_size: int | None = None) -> Any: ...
+    async def iter_lines(self) -> Any: ...
 
-class AsyncTaskRunResourceWithRawResponse:
-    create: Any
-    retrieve: Any
-    result: Any
-
-class TaskRunResourceWithStreamingResponse:
-    create: Any
-    retrieve: Any
-    result: Any
-
-class AsyncTaskRunResourceWithStreamingResponse:
-    create: Any
-    retrieve: Any
-    result: Any
-
-class BetaTaskRunResourceWithRawResponse:
-    create: Any
-    events: Any
-    result: Any
-
-class AsyncBetaTaskRunResourceWithRawResponse:
-    create: Any
-    events: Any
-    result: Any
-
-class BetaTaskRunResourceWithStreamingResponse:
-    create: Any
-    events: Any
-    result: Any
-
-class AsyncBetaTaskRunResourceWithStreamingResponse:
-    create: Any
-    events: Any
-    result: Any
-
-class BetaTaskGroupResourceWithRawResponse:
-    create: Any
-    retrieve: Any
-    add_runs: Any
-    events: Any
-    get_runs: Any
-
-class AsyncBetaTaskGroupResourceWithRawResponse:
-    create: Any
-    retrieve: Any
-    add_runs: Any
-    events: Any
-    get_runs: Any
-
-class BetaTaskGroupResourceWithStreamingResponse:
-    create: Any
-    retrieve: Any
-    add_runs: Any
-    events: Any
-    get_runs: Any
-
-class AsyncBetaTaskGroupResourceWithStreamingResponse:
-    create: Any
-    retrieve: Any
-    add_runs: Any
-    events: Any
-    get_runs: Any
-
-class BetaFindallResourceWithRawResponse:
-    create: Any
-    retrieve: Any
-    cancel: Any
-    enrich: Any
-    events: Any
-    extend: Any
-    ingest: Any
-    result: Any
-    schema: Any
-
-class AsyncBetaFindallResourceWithRawResponse:
-    create: Any
-    retrieve: Any
-    cancel: Any
-    enrich: Any
-    events: Any
-    extend: Any
-    ingest: Any
-    result: Any
-    schema: Any
-
-class BetaFindallResourceWithStreamingResponse:
-    create: Any
-    retrieve: Any
-    cancel: Any
-    enrich: Any
-    events: Any
-    extend: Any
-    ingest: Any
-    result: Any
-    schema: Any
-
-class AsyncBetaFindallResourceWithStreamingResponse:
-    create: Any
-    retrieve: Any
-    cancel: Any
-    enrich: Any
-    events: Any
-    extend: Any
-    ingest: Any
-    result: Any
-    schema: Any
-
-class BetaResourceWithRawResponse:
-    extract: Any
-    search: Any
-    @property
-    def task_run(self) -> BetaTaskRunResourceWithRawResponse: ...
-    @property
-    def task_group(self) -> BetaTaskGroupResourceWithRawResponse: ...
-    @property
-    def findall(self) -> BetaFindallResourceWithRawResponse: ...
-
-class AsyncBetaResourceWithRawResponse:
-    extract: Any
-    search: Any
-    @property
-    def task_run(self) -> AsyncBetaTaskRunResourceWithRawResponse: ...
-    @property
-    def task_group(self) -> AsyncBetaTaskGroupResourceWithRawResponse: ...
-    @property
-    def findall(self) -> AsyncBetaFindallResourceWithRawResponse: ...
-
-class BetaResourceWithStreamingResponse:
-    extract: Any
-    search: Any
-    @property
-    def task_run(self) -> BetaTaskRunResourceWithStreamingResponse: ...
-    @property
-    def task_group(self) -> BetaTaskGroupResourceWithStreamingResponse: ...
-    @property
-    def findall(self) -> BetaFindallResourceWithStreamingResponse: ...
-
-class AsyncBetaResourceWithStreamingResponse:
-    extract: Any
-    search: Any
-    @property
-    def task_run(self) -> AsyncBetaTaskRunResourceWithStreamingResponse: ...
-    @property
-    def task_group(self) -> AsyncBetaTaskGroupResourceWithStreamingResponse: ...
-    @property
-    def findall(self) -> AsyncBetaFindallResourceWithStreamingResponse: ...
-
-
-# -----------------------------------------------------------------------------
-# Client classes (public entry points)
-# -----------------------------------------------------------------------------
+# -----------------------------
+# Clients
+# -----------------------------
 
 DEFAULT_TIMEOUT: httpx.Timeout
 DEFAULT_MAX_RETRIES: int
 DEFAULT_CONNECTION_LIMITS: httpx.Limits
 
+class DefaultHttpxClient(httpx.Client): ...
+class DefaultAsyncHttpxClient(httpx.AsyncClient): ...
+class DefaultAioHttpClient(httpx.AsyncClient): ...
+
 class Parallel:
+    """
+    Construct a new synchronous Parallel client instance.
+
+    This automatically infers the `api_key` argument from the `PARALLEL_API_KEY` environment variable if it is not provided.
+    """
+    api_key: str
     task_run: TaskRunResource
     beta: BetaResource
-    with_raw_response: ParallelWithRawResponse
-    with_streaming_response: ParallelWithStreamedResponse
-
-    api_key: str
+    with_raw_response: "ParallelWithRawResponse"
+    with_streaming_response: "ParallelWithStreamedResponse"
 
     def __init__(
         self,
         *,
-        api_key: str | None = ...,
-        base_url: str | httpx.URL | None = ...,
+        api_key: str | None = None,
+        base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = ...,
         max_retries: int = ...,
-        default_headers: Mapping[str, str] | None = ...,
-        default_query: Mapping[str, object] | None = ...,
-        http_client: httpx.Client | None = ...,
-        _strict_response_validation: bool = ...,
+        default_headers: Mapping[str, str] | None = None,
+        default_query: Mapping[str, object] | None = None,
+        http_client: httpx.Client | None = None,
+        _strict_response_validation: bool = False,
     ) -> None: ...
 
     def copy(
         self,
         *,
-        api_key: str | None = ...,
-        base_url: str | httpx.URL | None = ...,
+        api_key: str | None = None,
+        base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = ...,
-        http_client: httpx.Client | None = ...,
+        http_client: httpx.Client | None = None,
         max_retries: int | NotGiven = ...,
-        default_headers: Mapping[str, str] | None = ...,
-        set_default_headers: Mapping[str, str] | None = ...,
-        default_query: Mapping[str, object] | None = ...,
-        set_default_query: Mapping[str, object] | None = ...,
+        default_headers: Mapping[str, str] | None = None,
+        set_default_headers: Mapping[str, str] | None = None,
+        default_query: Mapping[str, object] | None = None,
+        set_default_query: Mapping[str, object] | None = None,
         _extra_kwargs: Mapping[str, Any] = ...,
-    ) -> Parallel: ...
+    ) -> "Parallel": ...
 
-    with_options: Any  # alias of copy
+    with_options: Any  # alias for copy
 
 class AsyncParallel:
+    """
+    Construct a new async AsyncParallel client instance.
+
+    This automatically infers the `api_key` argument from the `PARALLEL_API_KEY` environment variable if it is not provided.
+    """
+    api_key: str
     task_run: AsyncTaskRunResource
     beta: AsyncBetaResource
-    with_raw_response: AsyncParallelWithRawResponse
-    with_streaming_response: AsyncParallelWithStreamedResponse
-
-    api_key: str
+    with_raw_response: "AsyncParallelWithRawResponse"
+    with_streaming_response: "AsyncParallelWithStreamedResponse"
 
     def __init__(
         self,
         *,
-        api_key: str | None = ...,
-        base_url: str | httpx.URL | None = ...,
+        api_key: str | None = None,
+        base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = ...,
         max_retries: int = ...,
-        default_headers: Mapping[str, str] | None = ...,
-        default_query: Mapping[str, object] | None = ...,
-        http_client: httpx.AsyncClient | None = ...,
-        _strict_response_validation: bool = ...,
+        default_headers: Mapping[str, str] | None = None,
+        default_query: Mapping[str, object] | None = None,
+        http_client: httpx.AsyncClient | None = None,
+        _strict_response_validation: bool = False,
     ) -> None: ...
 
     def copy(
         self,
         *,
-        api_key: str | None = ...,
-        base_url: str | httpx.URL | None = ...,
+        api_key: str | None = None,
+        base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = ...,
-        http_client: httpx.AsyncClient | None = ...,
+        http_client: httpx.AsyncClient | None = None,
         max_retries: int | NotGiven = ...,
-        default_headers: Mapping[str, str] | None = ...,
-        set_default_headers: Mapping[str, str] | None = ...,
-        default_query: Mapping[str, object] | None = ...,
-        set_default_query: Mapping[str, object] | None = ...,
+        default_headers: Mapping[str, str] | None = None,
+        set_default_headers: Mapping[str, str] | None = None,
+        default_query: Mapping[str, object] | None = None,
+        set_default_query: Mapping[str, object] | None = None,
         _extra_kwargs: Mapping[str, Any] = ...,
-    ) -> AsyncParallel: ...
+    ) -> "AsyncParallel": ...
 
-    with_options: Any  # alias of copy
+    with_options: Any  # alias for copy
 
+# Aliases
 Client = Parallel
 AsyncClient = AsyncParallel
 
 class ParallelWithRawResponse:
     task_run: TaskRunResourceWithRawResponse
-    beta: BetaResourceWithRawResponse
-    def __init__(self, client: Parallel) -> None: ...
+    beta: Any
 
 class AsyncParallelWithRawResponse:
     task_run: AsyncTaskRunResourceWithRawResponse
-    beta: AsyncBetaResourceWithRawResponse
-    def __init__(self, client: AsyncParallel) -> None: ...
+    beta: Any
 
 class ParallelWithStreamedResponse:
     task_run: TaskRunResourceWithStreamingResponse
-    beta: BetaResourceWithStreamingResponse
-    def __init__(self, client: Parallel) -> None: ...
+    beta: Any
 
 class AsyncParallelWithStreamedResponse:
     task_run: AsyncTaskRunResourceWithStreamingResponse
-    beta: AsyncBetaResourceWithStreamingResponse
-    def __init__(self, client: AsyncParallel) -> None: ...
+    beta: Any
 
+# -----------------------------
+# Module-level "resources" proxy (runtime) - shown as a module-like object
+# -----------------------------
 
-# -----------------------------------------------------------------------------
-# `parallel.types` module footprint (re-exported models/params)
-# -----------------------------------------------------------------------------
+class _ResourcesModule(Protocol):
+    TaskRunResource: Type[TaskRunResource]
+    AsyncTaskRunResource: Type[AsyncTaskRunResource]
+    BetaResource: Type[BetaResource]
+    AsyncBetaResource: Type[AsyncBetaResource]
 
-class types:
-    # shared
-    Warning = Warning
-    ErrorObject = ErrorObject
-    SourcePolicy = SourcePolicy
-    ErrorResponse = ErrorResponse
+resources: _ResourcesModule
 
-    # core models
-    Citation = Citation
-    TaskRun = TaskRun
-    TaskSpec = TaskSpec
-    AutoSchema = AutoSchema
-    FieldBasis = FieldBasis
-    JsonSchema = JsonSchema
-    TextSchema = TextSchema
-    TaskRunResult = TaskRunResult
+# -----------------------------
+# Exported package namespace
+# -----------------------------
 
-    # params
-    TaskSpecParam = TaskSpecParam
-    AutoSchemaParam = AutoSchemaParam
-    JsonSchemaParam = JsonSchemaParam
-    TextSchemaParam = TextSchemaParam
-    TaskRunCreateParams = TaskRunCreateParams
-    TaskRunResultParams = TaskRunResultParams
+# The real package also exports: types (module), many classes above, defaults, and exceptions.
+class types:  # module-like placeholder
+    # stable
+    Warning: Type[Warning]
+    ErrorObject: Type[ErrorObject]
+    ErrorResponse: Type[ErrorResponse]
+    SourcePolicy: Type[BetaSourcePolicyModel]  # model form
+    Citation: Type[Citation]
+    FieldBasis: Type[FieldBasis]
+    TaskRun: Type[TaskRun]
+    TaskSpec: Type[TaskSpec]
+    AutoSchema: Type[AutoSchema]
+    JsonSchema: Type[JsonSchema]
+    TextSchema: Type[TextSchema]
+    TaskRunResult: Type[TaskRunResult]
+    TaskRunJsonOutput: Type[TaskRunJsonOutput]
+    TaskRunTextOutput: Type[TaskRunTextOutput]
+    ParsedTaskRunResult: Type[ParsedTaskRunResult[Any]]
+    TaskRunCreateParams: Type[TaskRunCreateParams]
+    TaskRunResultParams: Type[TaskRunResultParams]
+    # beta module is also present at parallel.types.beta
 
-    # outputs
-    TaskRunJsonOutput = TaskRunJsonOutput
-    TaskRunTextOutput = TaskRunTextOutput
-    ParsedTaskRunResult = ParsedTaskRunResult
-
-    # beta namespace
-    class beta:
-        Webhook = Webhook
-        McpServer = McpServer
-        TaskGroup = TaskGroup
-        UsageItem = UsageItem
-        ErrorEvent = ErrorEvent
-        FindallRun = FindallRun
-        ExtractError = ExtractError
-        McpToolCall = McpToolCall
-        SearchResult = SearchResult
-        WebhookParam = WebhookParam
-        BetaRunInput = BetaRunInput
-        ExtractResult = ExtractResult
-        FindallSchema = FindallSchema
-        TaskRunEvent = TaskRunEvent
-        ExtractResponse = ExtractResponse
-        McpServerParam = McpServerParam
-        TaskGroupStatus = TaskGroupStatus
-        WebSearchResult = WebSearchResult
-        BetaSearchParams = BetaSearchParams
-        FetchPolicyParam = FetchPolicyParam
-        FindallRunResult = FindallRunResult
-        BetaExtractParams = BetaExtractParams
-        ParallelBetaParam = ParallelBetaParam
-        BetaRunInputParam = BetaRunInputParam
-        BetaTaskRunResult = BetaTaskRunResult
-        FindallEnrichInput = FindallEnrichInput
-        FindallCreateParams = FindallCreateParams
-        FindallEnrichParams = FindallEnrichParams
-        FindallEventsParams = FindallEventsParams
-        FindallExtendParams = FindallExtendParams
-        FindallIngestParams = FindallIngestParams
-        ExcerptSettingsParam = ExcerptSettingsParam
-        TaskRunCreateParams = BetaTaskRunCreateParams
-        TaskRunResultParams = BetaTaskRunResultParams
-        FindallEventsResponse = FindallEventsResponse
-        TaskGroupRunResponse = TaskGroupRunResponse
-        FindallRunStatusEvent = FindallRunStatusEvent
-        TaskGroupCreateParams = TaskGroupCreateParams
-        TaskGroupEventsParams = TaskGroupEventsParams
-        TaskRunEventsResponse = TaskRunEventsResponse
-        FindallRetrieveResponse = FindallRetrieveResponse
-        TaskGroupAddRunsParams = TaskGroupAddRunsParams
-        TaskGroupEventsResponse = TaskGroupEventsResponse
-        TaskGroupGetRunsParams = TaskGroupGetRunsParams
-        FindallSchemaUpdatedEvent = FindallSchemaUpdatedEvent
-        TaskGroupGetRunsResponse = TaskGroupGetRunsResponse
-        FindallCandidateMatchStatusEvent = FindallCandidateMatchStatusEvent
-
-
-# -----------------------------------------------------------------------------
-# Helpers exported at top-level
-# -----------------------------------------------------------------------------
-
-def file_from_path(path: str) -> Tuple[Optional[str], bytes]: ...
 ```
 
----
-
-If you want, I can also:
-1) generate a second variant that **includes every single class** (including all internal helpers in `_utils`, `_models`, `_response`, etc.) as a monolithic stub (much bigger), or  
-2) emit this as **two stubs**: `parallel.pyi` + `parallel.types.pyi`, which can be friendlier for some tooling.
+If you want, I can also generate an **“ultra-complete”** version that includes *every* `parallel.types.*` and `parallel.types.beta.*` class/TypedDict/type-alias found in the tree (it will be much longer), still as a single `.pyi` file.
