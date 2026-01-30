@@ -1,15 +1,18 @@
+Below is a **single consolidated `.d.ts`** that captures the **public footprint** of the SDK as shown in your tree. I only included the pieces that are *publicly importable* from the package entrypoint (`/src/index.ts`) and the public resource surface (`/src/resources/**`), plus the public “core” modules that are exported (e.g. `APIPromise`, streaming, errors, uploads, `APIResource`). I copied doc-comments **1:1 where present** (and omitted internal-only types/modules under `/src/internal/**`, except where a public type references an internal-shaped type—those are represented minimally).
+
+> Filename suggestion: `parallel-sdk-footprint.d.ts`
+
 ```ts
-// parallel-sdk-footprint.d.ts
-// NOTE: This is a single-file "footprint" summary of the public API surface.
-// It is intended for LLM/tooling consumption (types + doc-comments).
-// Doc-comments that exist in the source have been copied 1:1 where included.
-// (Generated from the provided repository snapshot.)
+// Type definitions for Parallel SDK (summarized public footprint)
+// Project: parallel-sdk-typescript
+// Definitions by: (generated)
+// NOTE: This file is a consolidated view of the public API surface for LLM consumption.
 
 /* =========================================
  * Version
  * ========================================= */
 
-export const VERSION: '0.3.0';
+export const VERSION: '0.3.1'; // x-release-please-version
 
 /* =========================================
  * Core: Errors
@@ -44,7 +47,7 @@ export class APIUserAbortError extends APIError<undefined, undefined, undefined>
 }
 
 export class APIConnectionError extends APIError<undefined, undefined, undefined> {
-  constructor({ message, cause }?: { message?: string | undefined; cause?: Error | undefined });
+  constructor({ message, cause }: { message?: string | undefined; cause?: Error | undefined });
 }
 
 export class APIConnectionTimeoutError extends APIConnectionError {
@@ -64,6 +67,8 @@ export class InternalServerError extends APIError<number, Headers> {}
  * Core: APIResource
  * ========================================= */
 
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+
 export abstract class APIResource {
   protected _client: Parallel;
   constructor(client: Parallel);
@@ -73,11 +78,32 @@ export abstract class APIResource {
  * Core: APIPromise
  * ========================================= */
 
-/**
- * A subclass of `Promise` providing additional helper methods
- * for interacting with the SDK.
- */
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+
 export class APIPromise<T> extends Promise<T> {
+  constructor(
+    client: Parallel,
+    responsePromise: Promise<{
+      response: Response;
+      options: Parallel.RequestOptions & { method: any; path: string };
+      controller: AbortController;
+      requestLogID: string;
+      retryOfRequestLogID: string | undefined;
+      startTime: number;
+    }>,
+    parseResponse?: (
+      client: Parallel,
+      props: {
+        response: Response;
+        options: Parallel.RequestOptions & { method: any; path: string };
+        controller: AbortController;
+        requestLogID: string;
+        retryOfRequestLogID: string | undefined;
+        startTime: number;
+      },
+    ) => T | Promise<T>,
+  );
+
   /**
    * Gets the raw `Response` instance instead of parsing the response
    * data.
@@ -153,21 +179,43 @@ export class Stream<Item> implements AsyncIterable<Item> {
 
 export type Uploadable = File | Response | (AsyncIterable<Uint8Array> & { path: string | { toString(): string } }) | Blob;
 
+/* Copied doc-comment 1:1 from src/internal/to-file.ts */
+/**
+ * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
+ * @param value the raw content of the file. Can be an {@link Uploadable}, BlobLikePart, or AsyncIterable of BlobLikeParts
+ * @param {string=} name the name of the file. If omitted, toFile will try to determine a file name from bits if possible
+ * @param {Object=} options additional properties
+ * @param {string=} options.type the MIME type of the content
+ * @param {number=} options.lastModified the last modified timestamp
+ * @returns a {@link File} with the given properties
+ */
+export function toFile(
+  value:
+    | File
+    | Response
+    | Exclude<string | ArrayBuffer | ArrayBufferView | Blob | DataView, string>
+    | AsyncIterable<string | ArrayBuffer | ArrayBufferView | Blob | DataView>
+    | PromiseLike<
+        | File
+        | Response
+        | Exclude<string | ArrayBuffer | ArrayBufferView | Blob | DataView, string>
+        | AsyncIterable<string | ArrayBuffer | ArrayBufferView | Blob | DataView>
+      >,
+  name?: string | null | undefined,
+  options?: { type?: string; lastModified?: number } | undefined,
+): Promise<File>;
+
 export type ToFileInput =
-  | (Blob & { name?: string; lastModified: number }) // File-like (approx)
-  | { url: string; blob(): Promise<Blob> } // Response-like (approx)
+  | File
+  | { url: string; blob(): Promise<any> }
   | Exclude<string | ArrayBuffer | ArrayBufferView | Blob | DataView, string>
   | AsyncIterable<string | ArrayBuffer | ArrayBufferView | Blob | DataView>;
 
-export function toFile(
-  value: ToFileInput | PromiseLike<ToFileInput>,
-  name?: string | null | undefined,
-  options?: FilePropertyBag | undefined,
-): Promise<File>;
-
 /* =========================================
- * Shared resource models
+ * Resources: Shared
  * ========================================= */
+
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 /**
  * An error message.
@@ -256,8 +304,10 @@ export interface Warning {
 }
 
 /* =========================================
- * Resource: TaskRun (stable)
+ * Resources: TaskRun (stable)
  * ========================================= */
+
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 export class TaskRun extends APIResource {
   /**
@@ -267,14 +317,14 @@ export class TaskRun extends APIResource {
    *
    * Beta features can be enabled by setting the 'parallel-beta' header.
    */
-  create(body: TaskRunCreateParams, options?: Parallel.RequestOptions): APIPromise<TaskRunObject>;
+  create(body: TaskRunCreateParams, options?: Parallel.RequestOptions): APIPromise<TaskRun.TaskRun>;
 
   /**
    * Retrieves run status by run_id.
    *
    * The run result is available from the `/result` endpoint.
    */
-  retrieve(runID: string, options?: Parallel.RequestOptions): APIPromise<TaskRunObject>;
+  retrieve(runID: string, options?: Parallel.RequestOptions): APIPromise<TaskRun.TaskRun>;
 
   /**
    * Retrieves a run result by run_id, blocking until the run is completed.
@@ -624,14 +674,32 @@ export interface TaskRunResultParams {
   timeout?: number;
 }
 
+export declare namespace TaskRun {
+  export type AutoSchema = import('./parallel-sdk-footprint').AutoSchema;
+  export type Citation = import('./parallel-sdk-footprint').Citation;
+  export type FieldBasis = import('./parallel-sdk-footprint').FieldBasis;
+  export type JsonSchema = import('./parallel-sdk-footprint').JsonSchema;
+  export type RunInput = import('./parallel-sdk-footprint').RunInput;
+  export type TaskRun = import('./parallel-sdk-footprint').TaskRunObject;
+  export type TaskRunJsonOutput = import('./parallel-sdk-footprint').TaskRunJsonOutput;
+  export type TaskRunResult = import('./parallel-sdk-footprint').TaskRunResult;
+  export type TaskRunTextOutput = import('./parallel-sdk-footprint').TaskRunTextOutput;
+  export type TaskSpec = import('./parallel-sdk-footprint').TaskSpec;
+  export type TextSchema = import('./parallel-sdk-footprint').TextSchema;
+  export type TaskRunCreateParams = import('./parallel-sdk-footprint').TaskRunCreateParams;
+  export type TaskRunResultParams = import('./parallel-sdk-footprint').TaskRunResultParams;
+}
+
 /* =========================================
- * Resource: Beta (group)
+ * Resources: Beta (Beta root + subresources)
  * ========================================= */
 
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+
 export class Beta extends APIResource {
-  taskRun: BetaTaskRun;
-  taskGroup: BetaTaskGroup;
-  findall: FindAll;
+  taskRun: Beta.TaskRun;
+  taskGroup: Beta.TaskGroup;
+  findall: Beta.FindAll;
 
   /**
    * Extracts relevant content from specific web URLs.
@@ -639,7 +707,7 @@ export class Beta extends APIResource {
    * To access this endpoint, pass the `parallel-beta` header with the value
    * `search-extract-2025-10-10`.
    */
-  extract(params: BetaExtractParams, options?: Parallel.RequestOptions): APIPromise<ExtractResponse>;
+  extract(params: Beta.BetaExtractParams, options?: Parallel.RequestOptions): APIPromise<Beta.ExtractResponse>;
 
   /**
    * Searches the web.
@@ -647,7 +715,7 @@ export class Beta extends APIResource {
    * To access this endpoint, pass the `parallel-beta` header with the value
    * `search-extract-2025-10-10`.
    */
-  search(params: BetaSearchParams, options?: Parallel.RequestOptions): APIPromise<SearchResult>;
+  search(params: Beta.BetaSearchParams, options?: Parallel.RequestOptions): APIPromise<Beta.SearchResult>;
 }
 
 /**
@@ -841,14 +909,9 @@ export interface WebSearchResult {
 
 export interface BetaExtractParams {
   /**
-   * Body param:
+   * Body param
    */
   urls: Array<string>;
-
-  /**
-   * Header param: Optional header to specify the beta version(s) to enable.
-   */
-  betas: Array<ParallelBeta>;
 
   /**
    * Body param: Include excerpts from each URL relevant to the search objective and
@@ -879,9 +942,14 @@ export interface BetaExtractParams {
    * search queries.
    */
   search_queries?: Array<string> | null;
+
+  /**
+   * Header param: Optional header to specify the beta version(s) to enable.
+   */
+  betas?: Array<Beta.ParallelBeta>;
 }
 
-export namespace BetaExtractParams {
+export declare namespace BetaExtractParams {
   /**
    * Optional settings for returning full content.
    */
@@ -954,1504 +1022,1457 @@ export interface BetaSearchParams {
   /**
    * Header param: Optional header to specify the beta version(s) to enable.
    */
-  betas?: Array<ParallelBeta>;
+  betas?: Array<Beta.ParallelBeta>;
 }
 
-/* =========================================
- * Beta: TaskRun (events, MCP, webhooks)
- * ========================================= */
+/* ===== Beta.TaskRun ===== */
 
-export class BetaTaskRun extends APIResource {
-  /**
-   * Initiates a task run.
-   *
-   * Returns immediately with a run object in status 'queued'.
-   *
-   * Beta features can be enabled by setting the 'parallel-beta' header.
-   */
-  create(params: BetaTaskRunCreateParams, options?: Parallel.RequestOptions): APIPromise<TaskRunObject>;
+export declare namespace Beta {
+  export type ParallelBeta =
+    | 'mcp-server-2025-07-17'
+    | 'events-sse-2025-07-24'
+    | 'webhook-2025-08-12'
+    | 'findall-2025-09-15'
+    | 'search-extract-2025-10-10'
+    | 'field-basis-2025-11-25'
+    | (string & {});
 
-  /**
-   * Streams events for a task run.
-   *
-   * Returns a stream of events showing progress updates and state changes for the
-   * task run.
-   *
-   * For task runs that did not have enable_events set to true during creation, the
-   * frequency of events will be reduced.
-   */
-  events(runID: string, options?: Parallel.RequestOptions): APIPromise<Stream<BetaTaskRunEventsResponse>>;
-
-  /**
-   * Retrieves a run result by run_id, blocking until the run is completed.
-   */
-  result(
-    runID: string,
-    params?: BetaTaskRunResultParams | null | undefined,
-    options?: Parallel.RequestOptions,
-  ): APIPromise<BetaTaskRunResult>;
-}
-
-/**
- * Task run input with additional beta fields.
- */
-export interface BetaRunInput {
-  /**
-   * Input to the task, either text or a JSON object.
-   */
-  input: string | { [key: string]: unknown };
-
-  /**
-   * Processor to use for the task.
-   */
-  processor: string;
-
-  /**
-   * Controls tracking of task run execution progress. When set to true, progress
-   * events are recorded and can be accessed via the
-   * [Task Run events](https://platform.parallel.ai/api-reference) endpoint. When
-   * false, no progress events are tracked. Note that progress tracking cannot be
-   * enabled after a run has been created. The flag is set to true by default for
-   * premium processors (pro and above). To enable this feature in your requests,
-   * specify `events-sse-2025-07-24` as one of the values in `parallel-beta` header
-   * (for API calls) or `betas` param (for the SDKs).
-   */
-  enable_events?: boolean | null;
-
-  /**
-   * Optional list of MCP servers to use for the run. To enable this feature in your
-   * requests, specify `mcp-server-2025-07-17` as one of the values in
-   * `parallel-beta` header (for API calls) or `betas` param (for the SDKs).
-   */
-  mcp_servers?: Array<McpServer> | null;
-
-  /**
-   * User-provided metadata stored with the run. Keys and values must be strings with
-   * a maximum length of 16 and 512 characters respectively.
-   */
-  metadata?: { [key: string]: string | number | boolean } | null;
-
-  /**
-   * Source policy for web search results.
-   *
-   * This policy governs which sources are allowed/disallowed in results.
-   */
-  source_policy?: SourcePolicy | null;
-
-  /**
-   * Specification for a task.
-   *
-   * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
-   * Not specifying a TaskSpec is the same as setting an auto output schema.
-   *
-   * For convenience bare strings are also accepted as input or output schemas.
-   */
-  task_spec?: TaskSpec | null;
-
-  /**
-   * Webhooks for Task Runs.
-   */
-  webhook?: Webhook | null;
-}
-
-/**
- * Result of a beta task run. Available only if beta headers are specified.
- */
-export interface BetaTaskRunResult {
-  /**
-   * Output from the task conforming to the output schema.
-   */
-  output: BetaTaskRunResult.BetaTaskRunTextOutput | BetaTaskRunResult.BetaTaskRunJsonOutput;
-
-  /**
-   * Beta task run object with status 'completed'.
-   */
-  run: TaskRunObject;
-}
-
-export namespace BetaTaskRunResult {
-  /**
-   * Output from a task that returns text.
-   */
-  export interface BetaTaskRunTextOutput {
+  export class TaskRun extends APIResource {
     /**
-     * Basis for the output. To include per-list-element basis entries, send the
-     * `parallel-beta` header with the value `field-basis-2025-11-25` when creating the
-     * run.
+     * Initiates a task run.
+     *
+     * Returns immediately with a run object in status 'queued'.
+     *
+     * Beta features can be enabled by setting the 'parallel-beta' header.
      */
-    basis: Array<FieldBasis>;
+    create(params: TaskRunCreateParams, options?: Parallel.RequestOptions): APIPromise<TaskRunObject>;
 
     /**
-     * Text output from the task.
+     * Streams events for a task run.
+     *
+     * Returns a stream of events showing progress updates and state changes for the
+     * task run.
+     *
+     * For task runs that did not have enable_events set to true during creation, the
+     * frequency of events will be reduced.
      */
-    content: string;
+    events(runID: string, options?: Parallel.RequestOptions): APIPromise<Stream<TaskRunEventsResponse>>;
 
     /**
-     * The type of output being returned, as determined by the output schema of the
-     * task spec.
+     * Retrieves a run result by run_id, blocking until the run is completed.
      */
-    type: 'text';
-
-    /**
-     * Always None.
-     */
-    beta_fields?: { [key: string]: unknown } | null;
-
-    /**
-     * MCP tool calls made by the task.
-     */
-    mcp_tool_calls?: Array<McpToolCall> | null;
+    result(
+      runID: string,
+      params?: TaskRunResultParams | null | undefined,
+      options?: Parallel.RequestOptions,
+    ): APIPromise<BetaTaskRunResult>;
   }
-
-  /**
-   * Output from a task that returns JSON.
-   */
-  export interface BetaTaskRunJsonOutput {
-    /**
-     * Basis for the output. To include per-list-element basis entries, send the
-     * `parallel-beta` header with the value `field-basis-2025-11-25` when creating the
-     * run.
-     */
-    basis: Array<FieldBasis>;
-
-    /**
-     * Output from the task as a native JSON object, as determined by the output schema
-     * of the task spec.
-     */
-    content: { [key: string]: unknown };
-
-    /**
-     * The type of output being returned, as determined by the output schema of the
-     * task spec.
-     */
-    type: 'json';
-
-    /**
-     * Always None.
-     */
-    beta_fields?: { [key: string]: unknown } | null;
-
-    /**
-     * MCP tool calls made by the task.
-     */
-    mcp_tool_calls?: Array<McpToolCall> | null;
-
-    /**
-     * Output schema for the Task Run. Populated only if the task was executed with an
-     * auto schema.
-     */
-    output_schema?: { [key: string]: unknown } | null;
-  }
-}
-
-/**
- * Event indicating an error.
- */
-export interface ErrorEvent {
-  /**
-   * Error.
-   */
-  error: ErrorObject;
-
-  /**
-   * Event type; always 'error'.
-   */
-  type: 'error';
-}
-
-/**
- * MCP server configuration.
- */
-export interface McpServer {
-  /**
-   * Name of the MCP server.
-   */
-  name: string;
-
-  /**
-   * URL of the MCP server.
-   */
-  url: string;
-
-  /**
-   * List of allowed tools for the MCP server.
-   */
-  allowed_tools?: Array<string> | null;
-
-  /**
-   * Headers for the MCP server.
-   */
-  headers?: { [key: string]: string } | null;
-
-  /**
-   * Type of MCP server being configured. Always `url`.
-   */
-  type?: 'url';
-}
-
-/**
- * Result of an MCP tool call.
- */
-export interface McpToolCall {
-  /**
-   * Arguments used to call the MCP tool.
-   */
-  arguments: string;
-
-  /**
-   * Name of the MCP server.
-   */
-  server_name: string;
-
-  /**
-   * Identifier for the tool call.
-   */
-  tool_call_id: string;
-
-  /**
-   * Name of the tool being called.
-   */
-  tool_name: string;
-
-  /**
-   * Output received from the tool call, if successful.
-   */
-  content?: string | null;
-
-  /**
-   * Error message if the tool call failed.
-   */
-  error?: string | null;
-}
-
-/**
- * Model for the parallel-beta header.
- */
-export type ParallelBeta =
-  | 'mcp-server-2025-07-17'
-  | 'events-sse-2025-07-24'
-  | 'webhook-2025-08-12'
-  | 'findall-2025-09-15'
-  | 'search-extract-2025-10-10'
-  | 'field-basis-2025-11-25'
-  | (string & {});
-
-/**
- * Event when a task run transitions to a non-active status.
- *
- * May indicate completion, cancellation, or failure.
- */
-export interface TaskRunEvent {
-  /**
-   * Cursor to resume the event stream. Always empty for non Task Group runs.
-   */
-  event_id: string | null;
-
-  /**
-   * Task run object.
-   */
-  run: TaskRunObject;
-
-  /**
-   * Event type; always 'task_run.state'.
-   */
-  type: 'task_run.state';
 
   /**
    * Task run input with additional beta fields.
    */
-  input?: BetaRunInput | null;
-
-  /**
-   * Output from the run; included only if requested and if status == `completed`.
-   */
-  output?: TaskRunTextOutput | TaskRunJsonOutput | null;
-}
-
-/**
- * Webhooks for Task Runs.
- */
-export interface Webhook {
-  /**
-   * URL for the webhook.
-   */
-  url: string;
-
-  /**
-   * Event types to send the webhook notifications for.
-   */
-  event_types?: Array<'task_run.status'>;
-}
-
-/**
- * A progress update for a task run.
- */
-export type BetaTaskRunEventsResponse =
-  | BetaTaskRunEventsResponse.TaskRunProgressStatsEvent
-  | BetaTaskRunEventsResponse.TaskRunProgressMessageEvent
-  | TaskRunEvent
-  | ErrorEvent;
-
-export namespace BetaTaskRunEventsResponse {
-  /**
-   * A progress update for a task run.
-   */
-  export interface TaskRunProgressStatsEvent {
+  export interface BetaRunInput {
     /**
-     * Completion percentage of the task run. Ranges from 0 to 100 where 0 indicates no
-     * progress and 100 indicates completion.
+     * Input to the task, either text or a JSON object.
      */
-    progress_meter: number;
+    input: string | { [key: string]: unknown };
 
     /**
-     * Source stats describing progress so far.
+     * Processor to use for the task.
      */
-    source_stats: TaskRunProgressStatsEvent.SourceStats;
+    processor: string;
 
     /**
-     * Event type; always 'task_run.progress_stats'.
+     * Controls tracking of task run execution progress. When set to true, progress
+     * events are recorded and can be accessed via the
+     * [Task Run events](https://platform.parallel.ai/api-reference) endpoint. When
+     * false, no progress events are tracked. Note that progress tracking cannot be
+     * enabled after a run has been created. The flag is set to true by default for
+     * premium processors (pro and above). To enable this feature in your requests,
+     * specify `events-sse-2025-07-24` as one of the values in `parallel-beta` header
+     * (for API calls) or `betas` param (for the SDKs).
      */
-    type: 'task_run.progress_stats';
+    enable_events?: boolean | null;
+
+    /**
+     * Optional list of MCP servers to use for the run. To enable this feature in your
+     * requests, specify `mcp-server-2025-07-17` as one of the values in
+     * `parallel-beta` header (for API calls) or `betas` param (for the SDKs).
+     */
+    mcp_servers?: Array<McpServer> | null;
+
+    /**
+     * User-provided metadata stored with the run. Keys and values must be strings with
+     * a maximum length of 16 and 512 characters respectively.
+     */
+    metadata?: { [key: string]: string | number | boolean } | null;
+
+    /**
+     * Source policy for web search results.
+     *
+     * This policy governs which sources are allowed/disallowed in results.
+     */
+    source_policy?: SourcePolicy | null;
+
+    /**
+     * Specification for a task.
+     *
+     * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
+     * Not specifying a TaskSpec is the same as setting an auto output schema.
+     *
+     * For convenience bare strings are also accepted as input or output schemas.
+     */
+    task_spec?: TaskSpec | null;
+
+    /**
+     * Webhooks for Task Runs.
+     */
+    webhook?: Webhook | null;
   }
 
-  export namespace TaskRunProgressStatsEvent {
+  /**
+   * Result of a beta task run. Available only if beta headers are specified.
+   */
+  export interface BetaTaskRunResult {
     /**
-     * Source stats describing progress so far.
+     * Output from the task conforming to the output schema.
      */
-    export interface SourceStats {
+    output: BetaTaskRunResult.BetaTaskRunTextOutput | BetaTaskRunResult.BetaTaskRunJsonOutput;
+
+    /**
+     * Beta task run object with status 'completed'.
+     */
+    run: TaskRunObject;
+  }
+
+  export namespace BetaTaskRunResult {
+    /**
+     * Output from a task that returns text.
+     */
+    export interface BetaTaskRunTextOutput {
       /**
-       * Number of sources considered in processing the task.
+       * Basis for the output. To include per-list-element basis entries, send the
+       * `parallel-beta` header with the value `field-basis-2025-11-25` when creating the
+       * run.
        */
-      num_sources_considered: number | null;
+      basis: Array<FieldBasis>;
 
       /**
-       * Number of sources read in processing the task.
+       * Text output from the task.
        */
-      num_sources_read: number | null;
+      content: string;
 
       /**
-       * A sample of URLs of sources read in processing the task.
+       * The type of output being returned, as determined by the output schema of the
+       * task spec.
        */
-      sources_read_sample: Array<string> | null;
+      type: 'text';
+
+      /**
+       * Always None.
+       */
+      beta_fields?: { [key: string]: unknown } | null;
+
+      /**
+       * MCP tool calls made by the task.
+       */
+      mcp_tool_calls?: Array<McpToolCall> | null;
+    }
+
+    /**
+     * Output from a task that returns JSON.
+     */
+    export interface BetaTaskRunJsonOutput {
+      /**
+       * Basis for the output. To include per-list-element basis entries, send the
+       * `parallel-beta` header with the value `field-basis-2025-11-25` when creating the
+       * run.
+       */
+      basis: Array<FieldBasis>;
+
+      /**
+       * Output from the task as a native JSON object, as determined by the output schema
+       * of the task spec.
+       */
+      content: { [key: string]: unknown };
+
+      /**
+       * The type of output being returned, as determined by the output schema of the
+       * task spec.
+       */
+      type: 'json';
+
+      /**
+       * Always None.
+       */
+      beta_fields?: { [key: string]: unknown } | null;
+
+      /**
+       * MCP tool calls made by the task.
+       */
+      mcp_tool_calls?: Array<McpToolCall> | null;
+
+      /**
+       * Output schema for the Task Run. Populated only if the task was executed with an
+       * auto schema.
+       */
+      output_schema?: { [key: string]: unknown } | null;
     }
   }
 
   /**
-   * A message for a task run progress update.
+   * Event indicating an error.
    */
-  export interface TaskRunProgressMessageEvent {
+  export interface ErrorEvent {
     /**
-     * Progress update message.
+     * Error.
      */
-    message: string;
+    error: ErrorObject;
 
     /**
-     * Timestamp of the message.
+     * Event type; always 'error'.
      */
-    timestamp: string | null;
-
-    /**
-     * Event type; always starts with 'task_run.progress_msg'.
-     */
-    type:
-      | 'task_run.progress_msg.plan'
-      | 'task_run.progress_msg.search'
-      | 'task_run.progress_msg.result'
-      | 'task_run.progress_msg.tool_call'
-      | 'task_run.progress_msg.exec_status';
+    type: 'error';
   }
-}
-
-export interface BetaTaskRunCreateParams {
-  /**
-   * Body param: Input to the task, either text or a JSON object.
-   */
-  input: string | { [key: string]: unknown };
 
   /**
-   * Body param: Processor to use for the task.
+   * MCP server configuration.
    */
-  processor: string;
-
-  /**
-   * Body param: Controls tracking of task run execution progress. When set to true,
-   * progress events are recorded and can be accessed via the
-   * [Task Run events](https://platform.parallel.ai/api-reference) endpoint. When
-   * false, no progress events are tracked. Note that progress tracking cannot be
-   * enabled after a run has been created. The flag is set to true by default for
-   * premium processors (pro and above). To enable this feature in your requests,
-   * specify `events-sse-2025-07-24` as one of the values in `parallel-beta` header
-   * (for API calls) or `betas` param (for the SDKs).
-   */
-  enable_events?: boolean | null;
-
-  /**
-   * Body param: Optional list of MCP servers to use for the run. To enable this
-   * feature in your requests, specify `mcp-server-2025-07-17` as one of the values
-   * in `parallel-beta` header (for API calls) or `betas` param (for the SDKs).
-   */
-  mcp_servers?: Array<McpServer> | null;
-
-  /**
-   * Body param: User-provided metadata stored with the run. Keys and values must be
-   * strings with a maximum length of 16 and 512 characters respectively.
-   */
-  metadata?: { [key: string]: string | number | boolean } | null;
-
-  /**
-   * Body param: Source policy for web search results.
-   *
-   * This policy governs which sources are allowed/disallowed in results.
-   */
-  source_policy?: SourcePolicy | null;
-
-  /**
-   * Body param: Specification for a task.
-   *
-   * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
-   * Not specifying a TaskSpec is the same as setting an auto output schema.
-   *
-   * For convenience bare strings are also accepted as input or output schemas.
-   */
-  task_spec?: TaskSpec | null;
-
-  /**
-   * Body param: Webhooks for Task Runs.
-   */
-  webhook?: Webhook | null;
-
-  /**
-   * Header param: Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-export interface BetaTaskRunResultParams {
-  /**
-   * Query param:
-   */
-  timeout?: number;
-
-  /**
-   * Header param: Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-/* =========================================
- * Beta: TaskGroup
- * ========================================= */
-
-export class BetaTaskGroup extends APIResource {
-  /**
-   * Initiates a TaskGroup to group and track multiple runs.
-   */
-  create(body: TaskGroupCreateParams, options?: Parallel.RequestOptions): APIPromise<TaskGroup>;
-
-  /**
-   * Retrieves aggregated status across runs in a TaskGroup.
-   */
-  retrieve(taskGroupID: string, options?: Parallel.RequestOptions): APIPromise<TaskGroup>;
-
-  /**
-   * Initiates multiple task runs within a TaskGroup.
-   */
-  addRuns(
-    taskGroupID: string,
-    params: TaskGroupAddRunsParams,
-    options?: Parallel.RequestOptions,
-  ): APIPromise<TaskGroupRunResponse>;
-
-  /**
-   * Streams events from a TaskGroup: status updates and run completions.
-   *
-   * The connection will remain open for up to an hour as long as at least one run in
-   * the group is still active.
-   */
-  events(
-    taskGroupID: string,
-    query?: TaskGroupEventsParams | undefined,
-    options?: Parallel.RequestOptions,
-  ): APIPromise<Stream<TaskGroupEventsResponse>>;
-
-  /**
-   * Retrieves task runs in a TaskGroup and optionally their inputs and outputs.
-   *
-   * All runs within a TaskGroup are returned as a stream. To get the inputs and/or
-   * outputs back in the stream, set the corresponding `include_input` and
-   * `include_output` parameters to `true`.
-   *
-   * The stream is resumable using the `event_id` as the cursor. To resume a stream,
-   * specify the `last_event_id` parameter with the `event_id` of the last event in
-   * the stream. The stream will resume from the next event after the
-   * `last_event_id`.
-   */
-  getRuns(
-    taskGroupID: string,
-    query?: TaskGroupGetRunsParams | undefined,
-    options?: Parallel.RequestOptions,
-  ): APIPromise<Stream<TaskGroupGetRunsResponse>>;
-}
-
-/**
- * Response object for a task group, including its status and metadata.
- */
-export interface TaskGroup {
-  /**
-   * Timestamp of the creation of the group, as an RFC 3339 string.
-   */
-  created_at: string | null;
-
-  /**
-   * Status of the group.
-   */
-  status: TaskGroupStatus;
-
-  /**
-   * ID of the group.
-   */
-  taskgroup_id: string;
-
-  /**
-   * User-provided metadata stored with the group.
-   */
-  metadata?: { [key: string]: string | number | boolean } | null;
-}
-
-/**
- * Response from adding new task runs to a task group.
- */
-export interface TaskGroupRunResponse {
-  /**
-   * Cursor for these runs in the event stream at
-   * taskgroup/events?last_event_id=<event_cursor>. Empty for the first runs in the
-   * group.
-   */
-  event_cursor: string | null;
-
-  /**
-   * Cursor for these runs in the run stream at
-   * taskgroup/runs?last_event_id=<run_cursor>. Empty for the first runs in the
-   * group.
-   */
-  run_cursor: string | null;
-
-  /**
-   * IDs of the newly created runs.
-   */
-  run_ids: Array<string>;
-
-  /**
-   * Status of the group.
-   */
-  status: TaskGroupStatus;
-}
-
-/**
- * Status of a task group.
- */
-export interface TaskGroupStatus {
-  /**
-   * True if at least one run in the group is currently active, i.e. status is one of
-   * {'cancelling', 'queued', 'running'}.
-   */
-  is_active: boolean;
-
-  /**
-   * Timestamp of the last status update to the group, as an RFC 3339 string.
-   */
-  modified_at: string | null;
-
-  /**
-   * Number of task runs in the group.
-   */
-  num_task_runs: number;
-
-  /**
-   * Human-readable status message for the group.
-   */
-  status_message: string | null;
-
-  /**
-   * Number of task runs with each status.
-   */
-  task_run_status_counts: { [key: string]: number };
-}
-
-/**
- * Event indicating an update to group status.
- */
-export type TaskGroupEventsResponse =
-  | TaskGroupEventsResponse.TaskGroupStatusEvent
-  | TaskRunEvent
-  | ErrorEvent;
-
-export namespace TaskGroupEventsResponse {
-  /**
-   * Event indicating an update to group status.
-   */
-  export interface TaskGroupStatusEvent {
+  export interface McpServer {
     /**
-     * Cursor to resume the event stream.
-     */
-    event_id: string;
-
-    /**
-     * Task group status object.
-     */
-    status: TaskGroupStatus;
-
-    /**
-     * Event type; always 'task_group_status'.
-     */
-    type: 'task_group_status';
-  }
-}
-
-/**
- * Event when a task run transitions to a non-active status.
- *
- * May indicate completion, cancellation, or failure.
- */
-export type TaskGroupGetRunsResponse = TaskRunEvent | ErrorEvent;
-
-export interface TaskGroupCreateParams {
-  /**
-   * User-provided metadata stored with the task group.
-   */
-  metadata?: { [key: string]: string | number | boolean } | null;
-}
-
-export interface TaskGroupAddRunsParams {
-  /**
-   * Body param: List of task runs to execute.
-   */
-  inputs: Array<BetaRunInput>;
-
-  /**
-   * Body param: Specification for a task.
-   *
-   * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
-   * Not specifying a TaskSpec is the same as setting an auto output schema.
-   *
-   * For convenience bare strings are also accepted as input or output schemas.
-   */
-  default_task_spec?: TaskSpec | null;
-
-  /**
-   * Header param: Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-export interface TaskGroupEventsParams {
-  last_event_id?: string | null;
-  timeout?: number | null;
-}
-
-export interface TaskGroupGetRunsParams {
-  include_input?: boolean;
-  include_output?: boolean;
-  last_event_id?: string | null;
-  status?:
-    | 'queued'
-    | 'action_required'
-    | 'running'
-    | 'completed'
-    | 'failed'
-    | 'cancelling'
-    | 'cancelled'
-    | null;
-}
-
-/* =========================================
- * Beta: FindAll
- * ========================================= */
-
-export class FindAll extends APIResource {
-  /**
-   * Starts a FindAll run.
-   *
-   * This endpoint immediately returns a FindAll run object with status set to
-   * 'queued'. You can get the run result snapshot using the GET
-   * /v1beta/findall/runs/{findall_id}/result endpoint. You can track the progress of
-   * the run by:
-   *
-   * - Polling the status using the GET /v1beta/findall/runs/{findall_id} endpoint,
-   * - Subscribing to real-time updates via the
-   *   /v1beta/findall/runs/{findall_id}/events endpoint,
-   * - Or specifying a webhook with relevant event types during run creation to
-   *   receive notifications.
-   */
-  create(params: FindAllCreateParams, options?: Parallel.RequestOptions): APIPromise<FindAllRun>;
-
-  /**
-   * Retrieve a FindAll run.
-   */
-  retrieve(
-    findallID: string,
-    params?: FindAllRetrieveParams | null | undefined,
-    options?: Parallel.RequestOptions,
-  ): APIPromise<FindAllRun>;
-
-  /**
-   * Cancel a FindAll run.
-   */
-  cancel(
-    findallID: string,
-    params?: FindAllCancelParams | null | undefined,
-    options?: Parallel.RequestOptions,
-  ): APIPromise<unknown>;
-
-  /**
-   * Add an enrichment to a FindAll run.
-   */
-  enrich(findallID: string, params: FindAllEnrichParams, options?: Parallel.RequestOptions): APIPromise<FindAllSchema>;
-
-  /**
-   * Stream events from a FindAll run.
-   *
-   * Args: request: The Shapi request findall_id: The FindAll run ID last_event_id:
-   * Optional event ID to resume from. timeout: Optional timeout in seconds. If None,
-   * keep connection alive as long as the run is going. If set, stop after specified
-   * duration.
-   */
-  events(
-    findallID: string,
-    params?: FindAllEventsParams | undefined,
-    options?: Parallel.RequestOptions,
-  ): APIPromise<Stream<FindAllEventsResponse>>;
-
-  /**
-   * Extend a FindAll run by adding additional matches to the current match limit.
-   */
-  extend(findallID: string, params: FindAllExtendParams, options?: Parallel.RequestOptions): APIPromise<FindAllSchema>;
-
-  /**
-   * Transforms a natural language search objective into a structured FindAll spec.
-   *
-   * Note: Access to this endpoint requires the parallel-beta header.
-   *
-   * The generated specification serves as a suggested starting point and can be
-   * further customized by the user.
-   */
-  ingest(params: FindAllIngestParams, options?: Parallel.RequestOptions): APIPromise<FindAllSchema>;
-
-  /**
-   * Retrieve the FindAll run result at the time of the request.
-   */
-  result(
-    findallID: string,
-    params?: FindAllResultParams | null | undefined,
-    options?: Parallel.RequestOptions,
-  ): APIPromise<FindAllRunResult>;
-
-  /**
-   * Get FindAll Run Schema
-   */
-  schema(
-    findallID: string,
-    params?: FindAllSchemaParams | null | undefined,
-    options?: Parallel.RequestOptions,
-  ): APIPromise<FindAllSchema>;
-}
-
-/**
- * Event containing a candidate whose match status has changed.
- */
-export interface FindAllCandidateMatchStatusEvent {
-  /**
-   * The candidate whose match status has been updated.
-   */
-  data: FindAllCandidateMatchStatusEvent.Data;
-
-  /**
-   * Unique event identifier for the event.
-   */
-  event_id: string;
-
-  /**
-   * Timestamp of the event.
-   */
-  timestamp: string;
-
-  /**
-   * Event type; one of findall.candidate.generated, findall.candidate.matched,
-   * findall.candidate.unmatched, findall.candidate.discarded,
-   * findall.candidate.enriched.
-   */
-  type:
-    | 'findall.candidate.generated'
-    | 'findall.candidate.matched'
-    | 'findall.candidate.unmatched'
-    | 'findall.candidate.discarded'
-    | 'findall.candidate.enriched';
-}
-
-export namespace FindAllCandidateMatchStatusEvent {
-  /**
-   * The candidate whose match status has been updated.
-   */
-  export interface Data {
-    /**
-     * ID of the candidate.
-     */
-    candidate_id: string;
-
-    /**
-     * Status of the candidate. One of generated, matched, unmatched, discarded.
-     */
-    match_status: 'generated' | 'matched' | 'unmatched' | 'discarded';
-
-    /**
-     * Name of the candidate.
+     * Name of the MCP server.
      */
     name: string;
 
     /**
-     * URL that provides context or details of the entity for disambiguation.
+     * URL of the MCP server.
      */
     url: string;
 
     /**
-     * List of FieldBasis objects supporting the output.
+     * List of allowed tools for the MCP server.
      */
-    basis?: Array<FieldBasis> | null;
+    allowed_tools?: Array<string> | null;
 
     /**
-     * Brief description of the entity that can help answer whether entity satisfies
-     * the query.
+     * Headers for the MCP server.
      */
-    description?: string | null;
+    headers?: { [key: string]: string } | null;
 
     /**
-     * Results of the match condition evaluations for this candidate. This object
-     * contains the structured output that determines whether the candidate matches the
-     * overall FindAll objective.
+     * Type of MCP server being configured. Always `url`.
      */
-    output?: { [key: string]: unknown } | null;
-  }
-}
-
-/**
- * Input model for FindAll enrich.
- */
-export interface FindAllEnrichInput {
-  /**
-   * JSON schema for the enrichment output schema for the FindAll run.
-   */
-  output_schema: JsonSchema;
-
-  /**
-   * List of MCP servers to use for the task.
-   */
-  mcp_servers?: Array<McpServer> | null;
-
-  /**
-   * Processor to use for the task.
-   */
-  processor?: string;
-}
-
-/**
- * Input model for FindAll extend.
- */
-export interface FindAllExtendInput {
-  /**
-   * Additional number of matches to find for this FindAll run. This value will be
-   * added to the current match limit to determine the new total match limit. Must be
-   * greater than 0.
-   */
-  additional_match_limit: number;
-}
-
-/**
- * FindAll run object with status and metadata.
- */
-export interface FindAllRun {
-  /**
-   * ID of the FindAll run.
-   */
-  findall_id: string;
-
-  /**
-   * Generator for the FindAll run.
-   */
-  generator: 'base' | 'core' | 'pro' | 'preview';
-
-  /**
-   * Status object for the FindAll run.
-   */
-  status: FindAllRun.Status;
-
-  /**
-   * Timestamp of the creation of the run, in RFC 3339 format.
-   */
-  created_at?: string | null;
-
-  /**
-   * Metadata for the FindAll run.
-   */
-  metadata?: { [key: string]: string | number | boolean } | null;
-
-  /**
-   * Timestamp of the latest modification to the FindAll run result, in RFC 3339
-   * format.
-   */
-  modified_at?: string | null;
-}
-
-export namespace FindAllRun {
-  /**
-   * Status object for the FindAll run.
-   */
-  export interface Status {
-    /**
-     * Whether the FindAll run is active
-     */
-    is_active: boolean;
-
-    /**
-     * Candidate metrics for the FindAll run.
-     */
-    metrics: Status.Metrics;
-
-    /**
-     * Status of the FindAll run.
-     */
-    status: 'queued' | 'action_required' | 'running' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
-
-    /**
-     * Reason for termination when FindAll run is in terminal status.
-     */
-    termination_reason?:
-      | 'low_match_rate'
-      | 'match_limit_met'
-      | 'candidates_exhausted'
-      | 'user_cancelled'
-      | 'error_occurred'
-      | 'timeout'
-      | null;
+    type?: 'url';
   }
 
-  export namespace Status {
+  /**
+   * Result of an MCP tool call.
+   */
+  export interface McpToolCall {
     /**
-     * Candidate metrics for the FindAll run.
+     * Arguments used to call the MCP tool.
      */
-    export interface Metrics {
-      /**
-       * Number of candidates that were selected.
-       */
-      generated_candidates_count?: number;
+    arguments: string;
 
-      /**
-       * Number of candidates that evaluated to matched.
-       */
-      matched_candidates_count?: number;
-    }
+    /**
+     * Name of the MCP server.
+     */
+    server_name: string;
+
+    /**
+     * Identifier for the tool call.
+     */
+    tool_call_id: string;
+
+    /**
+     * Name of the tool being called.
+     */
+    tool_name: string;
+
+    /**
+     * Output received from the tool call, if successful.
+     */
+    content?: string | null;
+
+    /**
+     * Error message if the tool call failed.
+     */
+    error?: string | null;
   }
-}
-
-/**
- * Input model for FindAll run.
- */
-export interface FindAllRunInput {
-  /**
-   * Type of the entity for the FindAll run.
-   */
-  entity_type: string;
 
   /**
-   * Generator for the FindAll run. One of base, core, pro, preview.
+   * Event when a task run transitions to a non-active status.
+   *
+   * May indicate completion, cancellation, or failure.
    */
-  generator: 'base' | 'core' | 'pro' | 'preview';
+  export interface TaskRunEvent {
+    /**
+     * Cursor to resume the event stream. Always empty for non Task Group runs.
+     */
+    event_id: string | null;
 
-  /**
-   * List of match conditions for the FindAll run.
-   */
-  match_conditions: Array<FindAllRunInput.MatchCondition>;
+    /**
+     * Task run object.
+     */
+    run: TaskRunObject;
 
-  /**
-   * Maximum number of matches to find for this FindAll run. Must be between 5 and
-   * 1000 (inclusive).
-   */
-  match_limit: number;
+    /**
+     * Event type; always 'task_run.state'.
+     */
+    type: 'task_run.state';
 
-  /**
-   * Natural language objective of the FindAll run.
-   */
-  objective: string;
+    /**
+     * Task run input with additional beta fields.
+     */
+    input?: BetaRunInput | null;
 
-  /**
-   * List of entity names/IDs to exclude from results.
-   */
-  exclude_list?: Array<FindAllRunInput.ExcludeList> | null;
-
-  /**
-   * Metadata for the FindAll run.
-   */
-  metadata?: { [key: string]: string | number | boolean } | null;
+    /**
+     * Output from the run; included only if requested and if status == `completed`.
+     */
+    output?: TaskRunTextOutput | TaskRunJsonOutput | null;
+  }
 
   /**
    * Webhooks for Task Runs.
    */
-  webhook?: Webhook | null;
-}
-
-export namespace FindAllRunInput {
-  /**
-   * Match condition model for FindAll ingest.
-   */
-  export interface MatchCondition {
+  export interface Webhook {
     /**
-     * Detailed description of the match condition. Include as much specific
-     * information as possible to help improve the quality and accuracy of Find All run
-     * results.
-     */
-    description: string;
-
-    /**
-     * Name of the match condition.
-     */
-    name: string;
-  }
-
-  /**
-   * Exclude candidate input model for FindAll run.
-   */
-  export interface ExcludeList {
-    /**
-     * Name of the entity to exclude from results.
-     */
-    name: string;
-
-    /**
-     * URL of the entity to exclude from results.
+     * URL for the webhook.
      */
     url: string;
+
+    /**
+     * Event types to send the webhook notifications for.
+     */
+    event_types?: Array<'task_run.status'>;
   }
-}
 
-/**
- * Complete FindAll search results.
- *
- * Represents a snapshot of a FindAll run, including run metadata and a list of
- * candidate entities with their match status and details at the time the snapshot
- * was taken.
- */
-export interface FindAllRunResult {
   /**
-   * All evaluated candidates at the time of the snapshot.
+   * A progress update for a task run.
    */
-  candidates: Array<FindAllRunResult.Candidate>;
+  export type TaskRunEventsResponse =
+    | TaskRunEventsResponse.TaskRunProgressStatsEvent
+    | TaskRunEventsResponse.TaskRunProgressMessageEvent
+    | TaskRunEvent
+    | ErrorEvent;
+
+  export namespace TaskRunEventsResponse {
+    /**
+     * A progress update for a task run.
+     */
+    export interface TaskRunProgressStatsEvent {
+      /**
+       * Completion percentage of the task run. Ranges from 0 to 100 where 0 indicates no
+       * progress and 100 indicates completion.
+       */
+      progress_meter: number;
+
+      /**
+       * Source stats describing progress so far.
+       */
+      source_stats: TaskRunProgressStatsEvent.SourceStats;
+
+      /**
+       * Event type; always 'task_run.progress_stats'.
+       */
+      type: 'task_run.progress_stats';
+    }
+
+    export namespace TaskRunProgressStatsEvent {
+      /**
+       * Source stats describing progress so far.
+       */
+      export interface SourceStats {
+        /**
+         * Number of sources considered in processing the task.
+         */
+        num_sources_considered: number | null;
+
+        /**
+         * Number of sources read in processing the task.
+         */
+        num_sources_read: number | null;
+
+        /**
+         * A sample of URLs of sources read in processing the task.
+         */
+        sources_read_sample: Array<string> | null;
+      }
+    }
+
+    /**
+     * A message for a task run progress update.
+     */
+    export interface TaskRunProgressMessageEvent {
+      /**
+       * Progress update message.
+       */
+      message: string;
+
+      /**
+       * Timestamp of the message.
+       */
+      timestamp: string | null;
+
+      /**
+       * Event type; always starts with 'task_run.progress_msg'.
+       */
+      type:
+        | 'task_run.progress_msg.plan'
+        | 'task_run.progress_msg.search'
+        | 'task_run.progress_msg.result'
+        | 'task_run.progress_msg.tool_call'
+        | 'task_run.progress_msg.exec_status';
+    }
+  }
+
+  export interface TaskRunCreateParams {
+    /**
+     * Body param: Input to the task, either text or a JSON object.
+     */
+    input: string | { [key: string]: unknown };
+
+    /**
+     * Body param: Processor to use for the task.
+     */
+    processor: string;
+
+    /**
+     * Body param: Controls tracking of task run execution progress. When set to true,
+     * progress events are recorded and can be accessed via the
+     * [Task Run events](https://platform.parallel.ai/api-reference) endpoint. When
+     * false, no progress events are tracked. Note that progress tracking cannot be
+     * enabled after a run has been created. The flag is set to true by default for
+     * premium processors (pro and above). To enable this feature in your requests,
+     * specify `events-sse-2025-07-24` as one of the values in `parallel-beta` header
+     * (for API calls) or `betas` param (for the SDKs).
+     */
+    enable_events?: boolean | null;
+
+    /**
+     * Body param: Optional list of MCP servers to use for the run. To enable this
+     * feature in your requests, specify `mcp-server-2025-07-17` as one of the values
+     * in `parallel-beta` header (for API calls) or `betas` param (for the SDKs).
+     */
+    mcp_servers?: Array<McpServer> | null;
+
+    /**
+     * Body param: User-provided metadata stored with the run. Keys and values must be
+     * strings with a maximum length of 16 and 512 characters respectively.
+     */
+    metadata?: { [key: string]: string | number | boolean } | null;
+
+    /**
+     * Body param: Source policy for web search results.
+     *
+     * This policy governs which sources are allowed/disallowed in results.
+     */
+    source_policy?: SourcePolicy | null;
+
+    /**
+     * Body param: Specification for a task.
+     *
+     * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
+     * Not specifying a TaskSpec is the same as setting an auto output schema.
+     *
+     * For convenience bare strings are also accepted as input or output schemas.
+     */
+    task_spec?: TaskSpec | null;
+
+    /**
+     * Body param: Webhooks for Task Runs.
+     */
+    webhook?: Webhook | null;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  export interface TaskRunResultParams {
+    /**
+     * Query param
+     */
+    timeout?: number;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  /* ===== Beta.TaskGroup ===== */
+
+  export class TaskGroup extends APIResource {
+    /**
+     * Initiates a TaskGroup to group and track multiple runs.
+     */
+    create(body: TaskGroupCreateParams, options?: Parallel.RequestOptions): APIPromise<TaskGroupObject>;
+
+    /**
+     * Retrieves aggregated status across runs in a TaskGroup.
+     */
+    retrieve(taskGroupID: string, options?: Parallel.RequestOptions): APIPromise<TaskGroupObject>;
+
+    /**
+     * Initiates multiple task runs within a TaskGroup.
+     */
+    addRuns(
+      taskGroupID: string,
+      params: TaskGroupAddRunsParams,
+      options?: Parallel.RequestOptions,
+    ): APIPromise<TaskGroupRunResponse>;
+
+    /**
+     * Streams events from a TaskGroup: status updates and run completions.
+     *
+     * The connection will remain open for up to an hour as long as at least one run in
+     * the group is still active.
+     */
+    events(
+      taskGroupID: string,
+      query?: TaskGroupEventsParams | undefined,
+      options?: Parallel.RequestOptions,
+    ): APIPromise<Stream<TaskGroupEventsResponse>>;
+
+    /**
+     * Retrieves task runs in a TaskGroup and optionally their inputs and outputs.
+     *
+     * All runs within a TaskGroup are returned as a stream. To get the inputs and/or
+     * outputs back in the stream, set the corresponding `include_input` and
+     * `include_output` parameters to `true`.
+     *
+     * The stream is resumable using the `event_id` as the cursor. To resume a stream,
+     * specify the `last_event_id` parameter with the `event_id` of the last event in
+     * the stream. The stream will resume from the next event after the
+     * `last_event_id`.
+     */
+    getRuns(
+      taskGroupID: string,
+      query?: TaskGroupGetRunsParams | undefined,
+      options?: Parallel.RequestOptions,
+    ): APIPromise<Stream<TaskGroupGetRunsResponse>>;
+  }
 
   /**
-   * FindAll run object.
+   * Response object for a task group, including its status and metadata.
    */
-  run: FindAllRun;
+  export interface TaskGroupObject {
+    /**
+     * Timestamp of the creation of the group, as an RFC 3339 string.
+     */
+    created_at: string | null;
+
+    /**
+     * Status of the group.
+     */
+    status: TaskGroupStatus;
+
+    /**
+     * ID of the group.
+     */
+    taskgroup_id: string;
+
+    /**
+     * User-provided metadata stored with the group.
+     */
+    metadata?: { [key: string]: string | number | boolean } | null;
+  }
 
   /**
-   * ID of the last event of the run at the time of the request. This can be used to
-   * resume streaming from the last event.
+   * Response from adding new task runs to a task group.
    */
-  last_event_id?: string | null;
-}
+  export interface TaskGroupRunResponse {
+    /**
+     * Cursor for these runs in the event stream at
+     * taskgroup/events?last_event_id=<event_cursor>. Empty for the first runs in the
+     * group.
+     */
+    event_cursor: string | null;
 
-export namespace FindAllRunResult {
+    /**
+     * Cursor for these runs in the run stream at
+     * taskgroup/runs?last_event_id=<run_cursor>. Empty for the first runs in the
+     * group.
+     */
+    run_cursor: string | null;
+
+    /**
+     * IDs of the newly created runs.
+     */
+    run_ids: Array<string>;
+
+    /**
+     * Status of the group.
+     */
+    status: TaskGroupStatus;
+  }
+
   /**
-   * Candidate for a find all run that may end up as a match.
+   * Status of a task group.
+   */
+  export interface TaskGroupStatus {
+    /**
+     * True if at least one run in the group is currently active, i.e. status is one of
+     * {'cancelling', 'queued', 'running'}.
+     */
+    is_active: boolean;
+
+    /**
+     * Timestamp of the last status update to the group, as an RFC 3339 string.
+     */
+    modified_at: string | null;
+
+    /**
+     * Number of task runs in the group.
+     */
+    num_task_runs: number;
+
+    /**
+     * Human-readable status message for the group.
+     */
+    status_message: string | null;
+
+    /**
+     * Number of task runs with each status.
+     */
+    task_run_status_counts: { [key: string]: number };
+  }
+
+  /**
+   * Event indicating an update to group status.
+   */
+  export type TaskGroupEventsResponse =
+    | TaskGroupEventsResponse.TaskGroupStatusEvent
+    | TaskRunEvent
+    | ErrorEvent;
+
+  export namespace TaskGroupEventsResponse {
+    /**
+     * Event indicating an update to group status.
+     */
+    export interface TaskGroupStatusEvent {
+      /**
+       * Cursor to resume the event stream.
+       */
+      event_id: string;
+
+      /**
+       * Task group status object.
+       */
+      status: TaskGroupStatus;
+
+      /**
+       * Event type; always 'task_group_status'.
+       */
+      type: 'task_group_status';
+    }
+  }
+
+  /**
+   * Event when a task run transitions to a non-active status.
    *
-   * Contains all the candidate's metadata and the output of the match conditions. A
-   * candidate is a match if all match conditions are satisfied.
+   * May indicate completion, cancellation, or failure.
    */
-  export interface Candidate {
-    /**
-     * ID of the candidate.
-     */
-    candidate_id: string;
+  export type TaskGroupGetRunsResponse = TaskRunEvent | ErrorEvent;
 
+  export interface TaskGroupCreateParams {
     /**
-     * Status of the candidate. One of generated, matched, unmatched, discarded.
+     * User-provided metadata stored with the task group.
      */
-    match_status: 'generated' | 'matched' | 'unmatched' | 'discarded';
-
-    /**
-     * Name of the candidate.
-     */
-    name: string;
-
-    /**
-     * URL that provides context or details of the entity for disambiguation.
-     */
-    url: string;
-
-    /**
-     * List of FieldBasis objects supporting the output.
-     */
-    basis?: Array<FieldBasis> | null;
-
-    /**
-     * Brief description of the entity that can help answer whether entity satisfies
-     * the query.
-     */
-    description?: string | null;
-
-    /**
-     * Results of the match condition evaluations for this candidate. This object
-     * contains the structured output that determines whether the candidate matches the
-     * overall FindAll objective.
-     */
-    output?: { [key: string]: unknown } | null;
+    metadata?: { [key: string]: string | number | boolean } | null;
   }
-}
 
-/**
- * Event containing status update for FindAll run.
- */
-export interface FindAllRunStatusEvent {
-  /**
-   * Updated FindAll run information.
-   */
-  data: FindAllRun;
-
-  /**
-   * Unique event identifier for the event.
-   */
-  event_id: string;
-
-  /**
-   * Timestamp of the event.
-   */
-  timestamp: string;
-
-  /**
-   * Event type; always 'findall.status'.
-   */
-  type: 'findall.status';
-}
-
-/**
- * Response model for FindAll ingest.
- */
-export interface FindAllSchema {
-  /**
-   * Type of the entity for the FindAll run.
-   */
-  entity_type: string;
-
-  /**
-   * List of match conditions for the FindAll run.
-   */
-  match_conditions: Array<FindAllSchema.MatchCondition>;
-
-  /**
-   * Natural language objective of the FindAll run.
-   */
-  objective: string;
-
-  /**
-   * List of enrichment inputs for the FindAll run.
-   */
-  enrichments?: Array<FindAllEnrichInput> | null;
-
-  /**
-   * The generator of the FindAll run.
-   */
-  generator?: 'base' | 'core' | 'pro' | 'preview';
-
-  /**
-   * Max number of candidates to evaluate
-   */
-  match_limit?: number | null;
-}
-
-export namespace FindAllSchema {
-  /**
-   * Match condition model for FindAll ingest.
-   */
-  export interface MatchCondition {
+  export interface TaskGroupAddRunsParams {
     /**
-     * Detailed description of the match condition. Include as much specific
-     * information as possible to help improve the quality and accuracy of Find All run
-     * results.
+     * Body param: List of task runs to execute.
      */
-    description: string;
+    inputs: Array<BetaRunInput>;
 
     /**
-     * Name of the match condition.
+     * Body param: Specification for a task.
+     *
+     * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
+     * Not specifying a TaskSpec is the same as setting an auto output schema.
+     *
+     * For convenience bare strings are also accepted as input or output schemas.
      */
-    name: string;
+    default_task_spec?: TaskSpec | null;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
   }
-}
 
-/**
- * Event containing full snapshot of FindAll run state.
- */
-export interface FindAllSchemaUpdatedEvent {
-  /**
-   * Updated FindAll schema.
-   */
-  data: FindAllSchema;
+  export interface TaskGroupEventsParams {
+    last_event_id?: string | null;
+    timeout?: number | null;
+  }
 
-  /**
-   * Unique event identifier for the event.
-   */
-  event_id: string;
+  export interface TaskGroupGetRunsParams {
+    include_input?: boolean;
+    include_output?: boolean;
+    last_event_id?: string | null;
+    status?:
+      | 'queued'
+      | 'action_required'
+      | 'running'
+      | 'completed'
+      | 'failed'
+      | 'cancelling'
+      | 'cancelled'
+      | null;
+  }
 
-  /**
-   * Timestamp of the event.
-   */
-  timestamp: string;
+  /* ===== Beta.FindAll ===== */
 
-  /**
-   * Event type; always 'findall.schema.updated'.
-   */
-  type: 'findall.schema.updated';
-}
-
-/**
- * Input model for FindAll ingest.
- */
-export interface IngestInput {
-  /**
-   * Natural language objective to create a FindAll run spec.
-   */
-  objective: string;
-}
-
-export type FindAllCancelResponse = unknown;
-
-/**
- * Event containing full snapshot of FindAll run state.
- */
-export type FindAllEventsResponse =
-  | FindAllSchemaUpdatedEvent
-  | FindAllRunStatusEvent
-  | FindAllCandidateMatchStatusEvent
-  | ErrorEvent;
-
-export interface FindAllCreateParams {
-  /**
-   * Body param: Type of the entity for the FindAll run.
-   */
-  entity_type: string;
-
-  /**
-   * Body param: Generator for the FindAll run. One of base, core, pro, preview.
-   */
-  generator: 'base' | 'core' | 'pro' | 'preview';
-
-  /**
-   * Body param: List of match conditions for the FindAll run.
-   */
-  match_conditions: Array<FindAllCreateParams.MatchCondition>;
-
-  /**
-   * Body param: Maximum number of matches to find for this FindAll run. Must be
-   * between 5 and 1000 (inclusive).
-   */
-  match_limit: number;
-
-  /**
-   * Body param: Natural language objective of the FindAll run.
-   */
-  objective: string;
-
-  /**
-   * Body param: List of entity names/IDs to exclude from results.
-   */
-  exclude_list?: Array<FindAllCreateParams.ExcludeList> | null;
-
-  /**
-   * Body param: Metadata for the FindAll run.
-   */
-  metadata?: { [key: string]: string | number | boolean } | null;
-
-  /**
-   * Body param: Webhooks for Task Runs.
-   */
-  webhook?: Webhook | null;
-
-  /**
-   * Header param: Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-export namespace FindAllCreateParams {
-  /**
-   * Match condition model for FindAll ingest.
-   */
-  export interface MatchCondition {
+  export class FindAll extends APIResource {
     /**
-     * Detailed description of the match condition. Include as much specific
-     * information as possible to help improve the quality and accuracy of Find All run
-     * results.
+     * Starts a FindAll run.
+     *
+     * This endpoint immediately returns a FindAll run object with status set to
+     * 'queued'. You can get the run result snapshot using the GET
+     * /v1beta/findall/runs/{findall_id}/result endpoint. You can track the progress of
+     * the run by:
+     *
+     * - Polling the status using the GET /v1beta/findall/runs/{findall_id} endpoint,
+     * - Subscribing to real-time updates via the
+     *   /v1beta/findall/runs/{findall_id}/events endpoint,
+     * - Or specifying a webhook with relevant event types during run creation to
+     *   receive notifications.
      */
-    description: string;
+    create(params: FindAllCreateParams, options?: Parallel.RequestOptions): APIPromise<FindAllRun>;
 
     /**
-     * Name of the match condition.
+     * Retrieve a FindAll run.
      */
-    name: string;
+    retrieve(
+      findallID: string,
+      params?: FindAllRetrieveParams | null | undefined,
+      options?: Parallel.RequestOptions,
+    ): APIPromise<FindAllRun>;
+
+    /**
+     * Cancel a FindAll run.
+     */
+    cancel(
+      findallID: string,
+      params?: FindAllCancelParams | null | undefined,
+      options?: Parallel.RequestOptions,
+    ): APIPromise<unknown>;
+
+    /**
+     * Add an enrichment to a FindAll run.
+     */
+    enrich(
+      findallID: string,
+      params: FindAllEnrichParams,
+      options?: Parallel.RequestOptions,
+    ): APIPromise<FindAllSchema>;
+
+    /**
+     * Stream events from a FindAll run.
+     *
+     * Args: request: The Shapi request findall_id: The FindAll run ID last_event_id:
+     * Optional event ID to resume from. timeout: Optional timeout in seconds. If None,
+     * keep connection alive as long as the run is going. If set, stop after specified
+     * duration.
+     */
+    events(
+      findallID: string,
+      params?: FindAllEventsParams | undefined,
+      options?: Parallel.RequestOptions,
+    ): APIPromise<Stream<FindAllEventsResponse>>;
+
+    /**
+     * Extend a FindAll run by adding additional matches to the current match limit.
+     */
+    extend(
+      findallID: string,
+      params: FindAllExtendParams,
+      options?: Parallel.RequestOptions,
+    ): APIPromise<FindAllSchema>;
+
+    /**
+     * Transforms a natural language search objective into a structured FindAll spec.
+     *
+     * Note: Access to this endpoint requires the parallel-beta header.
+     *
+     * The generated specification serves as a suggested starting point and can be
+     * further customized by the user.
+     */
+    ingest(params: FindAllIngestParams, options?: Parallel.RequestOptions): APIPromise<FindAllSchema>;
+
+    /**
+     * Retrieve the FindAll run result at the time of the request.
+     */
+    result(
+      findallID: string,
+      params?: FindAllResultParams | null | undefined,
+      options?: Parallel.RequestOptions,
+    ): APIPromise<FindAllRunResult>;
+
+    /**
+     * Get FindAll Run Schema
+     */
+    schema(
+      findallID: string,
+      params?: FindAllSchemaParams | null | undefined,
+      options?: Parallel.RequestOptions,
+    ): APIPromise<FindAllSchema>;
   }
 
   /**
-   * Exclude candidate input model for FindAll run.
+   * Event containing a candidate whose match status has changed.
    */
-  export interface ExcludeList {
+  export interface FindAllCandidateMatchStatusEvent {
     /**
-     * Name of the entity to exclude from results.
+     * The candidate whose match status has been updated.
      */
-    name: string;
+    data: FindAllCandidateMatchStatusEvent.Data;
 
     /**
-     * URL of the entity to exclude from results.
+     * Unique event identifier for the event.
      */
-    url: string;
+    event_id: string;
+
+    /**
+     * Timestamp of the event.
+     */
+    timestamp: string;
+
+    /**
+     * Event type; one of findall.candidate.generated, findall.candidate.matched,
+     * findall.candidate.unmatched, findall.candidate.discarded,
+     * findall.candidate.enriched.
+     */
+    type:
+      | 'findall.candidate.generated'
+      | 'findall.candidate.matched'
+      | 'findall.candidate.unmatched'
+      | 'findall.candidate.discarded'
+      | 'findall.candidate.enriched';
+  }
+
+  export namespace FindAllCandidateMatchStatusEvent {
+    /**
+     * The candidate whose match status has been updated.
+     */
+    export interface Data {
+      /**
+       * ID of the candidate.
+       */
+      candidate_id: string;
+
+      /**
+       * Status of the candidate. One of generated, matched, unmatched, discarded.
+       */
+      match_status: 'generated' | 'matched' | 'unmatched' | 'discarded';
+
+      /**
+       * Name of the candidate.
+       */
+      name: string;
+
+      /**
+       * URL that provides context or details of the entity for disambiguation.
+       */
+      url: string;
+
+      /**
+       * List of FieldBasis objects supporting the output.
+       */
+      basis?: Array<FieldBasis> | null;
+
+      /**
+       * Brief description of the entity that can help answer whether entity satisfies
+       * the query.
+       */
+      description?: string | null;
+
+      /**
+       * Results of the match condition evaluations for this candidate. This object
+       * contains the structured output that determines whether the candidate matches the
+       * overall FindAll objective.
+       */
+      output?: { [key: string]: unknown } | null;
+    }
+  }
+
+  /**
+   * Input model for FindAll enrich.
+   */
+  export interface FindAllEnrichInput {
+    /**
+     * JSON schema for the enrichment output schema for the FindAll run.
+     */
+    output_schema: JsonSchema;
+
+    /**
+     * List of MCP servers to use for the task.
+     */
+    mcp_servers?: Array<McpServer> | null;
+
+    /**
+     * Processor to use for the task.
+     */
+    processor?: string;
+  }
+
+  /**
+   * Input model for FindAll extend.
+   */
+  export interface FindAllExtendInput {
+    /**
+     * Additional number of matches to find for this FindAll run. This value will be
+     * added to the current match limit to determine the new total match limit. Must be
+     * greater than 0.
+     */
+    additional_match_limit: number;
+  }
+
+  /**
+   * FindAll run object with status and metadata.
+   */
+  export interface FindAllRun {
+    /**
+     * ID of the FindAll run.
+     */
+    findall_id: string;
+
+    /**
+     * Generator for the FindAll run.
+     */
+    generator: 'base' | 'core' | 'pro' | 'preview';
+
+    /**
+     * Status object for the FindAll run.
+     */
+    status: FindAllRun.Status;
+
+    /**
+     * Timestamp of the creation of the run, in RFC 3339 format.
+     */
+    created_at?: string | null;
+
+    /**
+     * Metadata for the FindAll run.
+     */
+    metadata?: { [key: string]: string | number | boolean } | null;
+
+    /**
+     * Timestamp of the latest modification to the FindAll run result, in RFC 3339
+     * format.
+     */
+    modified_at?: string | null;
+  }
+
+  export namespace FindAllRun {
+    /**
+     * Status object for the FindAll run.
+     */
+    export interface Status {
+      /**
+       * Whether the FindAll run is active
+       */
+      is_active: boolean;
+
+      /**
+       * Candidate metrics for the FindAll run.
+       */
+      metrics: Status.Metrics;
+
+      /**
+       * Status of the FindAll run.
+       */
+      status: 'queued' | 'action_required' | 'running' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
+
+      /**
+       * Reason for termination when FindAll run is in terminal status.
+       */
+      termination_reason?:
+        | 'low_match_rate'
+        | 'match_limit_met'
+        | 'candidates_exhausted'
+        | 'user_cancelled'
+        | 'error_occurred'
+        | 'timeout'
+        | null;
+    }
+
+    export namespace Status {
+      /**
+       * Candidate metrics for the FindAll run.
+       */
+      export interface Metrics {
+        /**
+         * Number of candidates that were selected.
+         */
+        generated_candidates_count?: number;
+
+        /**
+         * Number of candidates that evaluated to matched.
+         */
+        matched_candidates_count?: number;
+      }
+    }
+  }
+
+  /**
+   * Input model for FindAll run.
+   */
+  export interface FindAllRunInput {
+    /**
+     * Type of the entity for the FindAll run.
+     */
+    entity_type: string;
+
+    /**
+     * Generator for the FindAll run. One of base, core, pro, preview.
+     */
+    generator: 'base' | 'core' | 'pro' | 'preview';
+
+    /**
+     * List of match conditions for the FindAll run.
+     */
+    match_conditions: Array<FindAllRunInput.MatchCondition>;
+
+    /**
+     * Maximum number of matches to find for this FindAll run. Must be between 5 and
+     * 1000 (inclusive).
+     */
+    match_limit: number;
+
+    /**
+     * Natural language objective of the FindAll run.
+     */
+    objective: string;
+
+    /**
+     * List of entity names/IDs to exclude from results.
+     */
+    exclude_list?: Array<FindAllRunInput.ExcludeList> | null;
+
+    /**
+     * Metadata for the FindAll run.
+     */
+    metadata?: { [key: string]: string | number | boolean } | null;
+
+    /**
+     * Webhooks for Task Runs.
+     */
+    webhook?: Webhook | null;
+  }
+
+  export namespace FindAllRunInput {
+    /**
+     * Match condition model for FindAll ingest.
+     */
+    export interface MatchCondition {
+      /**
+       * Detailed description of the match condition. Include as much specific
+       * information as possible to help improve the quality and accuracy of Find All run
+       * results.
+       */
+      description: string;
+
+      /**
+       * Name of the match condition.
+       */
+      name: string;
+    }
+
+    /**
+     * Exclude candidate input model for FindAll run.
+     */
+    export interface ExcludeList {
+      /**
+       * Name of the entity to exclude from results.
+       */
+      name: string;
+
+      /**
+       * URL of the entity to exclude from results.
+       */
+      url: string;
+    }
+  }
+
+  /**
+   * Complete FindAll search results.
+   *
+   * Represents a snapshot of a FindAll run, including run metadata and a list of
+   * candidate entities with their match status and details at the time the snapshot
+   * was taken.
+   */
+  export interface FindAllRunResult {
+    /**
+     * All evaluated candidates at the time of the snapshot.
+     */
+    candidates: Array<FindAllRunResult.Candidate>;
+
+    /**
+     * FindAll run object.
+     */
+    run: FindAllRun;
+
+    /**
+     * ID of the last event of the run at the time of the request. This can be used to
+     * resume streaming from the last event.
+     */
+    last_event_id?: string | null;
+  }
+
+  export namespace FindAllRunResult {
+    /**
+     * Candidate for a find all run that may end up as a match.
+     *
+     * Contains all the candidate's metadata and the output of the match conditions. A
+     * candidate is a match if all match conditions are satisfied.
+     */
+    export interface Candidate {
+      /**
+       * ID of the candidate.
+       */
+      candidate_id: string;
+
+      /**
+       * Status of the candidate. One of generated, matched, unmatched, discarded.
+       */
+      match_status: 'generated' | 'matched' | 'unmatched' | 'discarded';
+
+      /**
+       * Name of the candidate.
+       */
+      name: string;
+
+      /**
+       * URL that provides context or details of the entity for disambiguation.
+       */
+      url: string;
+
+      /**
+       * List of FieldBasis objects supporting the output.
+       */
+      basis?: Array<FieldBasis> | null;
+
+      /**
+       * Brief description of the entity that can help answer whether entity satisfies
+       * the query.
+       */
+      description?: string | null;
+
+      /**
+       * Results of the match condition evaluations for this candidate. This object
+       * contains the structured output that determines whether the candidate matches the
+       * overall FindAll objective.
+       */
+      output?: { [key: string]: unknown } | null;
+    }
+  }
+
+  /**
+   * Event containing status update for FindAll run.
+   */
+  export interface FindAllRunStatusEvent {
+    /**
+     * Updated FindAll run information.
+     */
+    data: FindAllRun;
+
+    /**
+     * Unique event identifier for the event.
+     */
+    event_id: string;
+
+    /**
+     * Timestamp of the event.
+     */
+    timestamp: string;
+
+    /**
+     * Event type; always 'findall.status'.
+     */
+    type: 'findall.status';
+  }
+
+  /**
+   * Response model for FindAll ingest.
+   */
+  export interface FindAllSchema {
+    /**
+     * Type of the entity for the FindAll run.
+     */
+    entity_type: string;
+
+    /**
+     * List of match conditions for the FindAll run.
+     */
+    match_conditions: Array<FindAllSchema.MatchCondition>;
+
+    /**
+     * Natural language objective of the FindAll run.
+     */
+    objective: string;
+
+    /**
+     * List of enrichment inputs for the FindAll run.
+     */
+    enrichments?: Array<FindAllEnrichInput> | null;
+
+    /**
+     * The generator of the FindAll run.
+     */
+    generator?: 'base' | 'core' | 'pro' | 'preview';
+
+    /**
+     * Max number of candidates to evaluate
+     */
+    match_limit?: number | null;
+  }
+
+  export namespace FindAllSchema {
+    /**
+     * Match condition model for FindAll ingest.
+     */
+    export interface MatchCondition {
+      /**
+       * Detailed description of the match condition. Include as much specific
+       * information as possible to help improve the quality and accuracy of Find All run
+       * results.
+       */
+      description: string;
+
+      /**
+       * Name of the match condition.
+       */
+      name: string;
+    }
+  }
+
+  /**
+   * Event containing full snapshot of FindAll run state.
+   */
+  export interface FindAllSchemaUpdatedEvent {
+    /**
+     * Updated FindAll schema.
+     */
+    data: FindAllSchema;
+
+    /**
+     * Unique event identifier for the event.
+     */
+    event_id: string;
+
+    /**
+     * Timestamp of the event.
+     */
+    timestamp: string;
+
+    /**
+     * Event type; always 'findall.schema.updated'.
+     */
+    type: 'findall.schema.updated';
+  }
+
+  /**
+   * Input model for FindAll ingest.
+   */
+  export interface IngestInput {
+    /**
+     * Natural language objective to create a FindAll run spec.
+     */
+    objective: string;
+  }
+
+  export type FindAllCancelResponse = unknown;
+
+  /**
+   * Event containing full snapshot of FindAll run state.
+   */
+  export type FindAllEventsResponse =
+    | FindAllSchemaUpdatedEvent
+    | FindAllRunStatusEvent
+    | FindAllCandidateMatchStatusEvent
+    | ErrorEvent;
+
+  export interface FindAllCreateParams {
+    /**
+     * Body param: Type of the entity for the FindAll run.
+     */
+    entity_type: string;
+
+    /**
+     * Body param: Generator for the FindAll run. One of base, core, pro, preview.
+     */
+    generator: 'base' | 'core' | 'pro' | 'preview';
+
+    /**
+     * Body param: List of match conditions for the FindAll run.
+     */
+    match_conditions: Array<FindAllCreateParams.MatchCondition>;
+
+    /**
+     * Body param: Maximum number of matches to find for this FindAll run. Must be
+     * between 5 and 1000 (inclusive).
+     */
+    match_limit: number;
+
+    /**
+     * Body param: Natural language objective of the FindAll run.
+     */
+    objective: string;
+
+    /**
+     * Body param: List of entity names/IDs to exclude from results.
+     */
+    exclude_list?: Array<FindAllCreateParams.ExcludeList> | null;
+
+    /**
+     * Body param: Metadata for the FindAll run.
+     */
+    metadata?: { [key: string]: string | number | boolean } | null;
+
+    /**
+     * Body param: Webhooks for Task Runs.
+     */
+    webhook?: Webhook | null;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  export namespace FindAllCreateParams {
+    /**
+     * Match condition model for FindAll ingest.
+     */
+    export interface MatchCondition {
+      /**
+       * Detailed description of the match condition. Include as much specific
+       * information as possible to help improve the quality and accuracy of Find All run
+       * results.
+       */
+      description: string;
+
+      /**
+       * Name of the match condition.
+       */
+      name: string;
+    }
+
+    /**
+     * Exclude candidate input model for FindAll run.
+     */
+    export interface ExcludeList {
+      /**
+       * Name of the entity to exclude from results.
+       */
+      name: string;
+
+      /**
+       * URL of the entity to exclude from results.
+       */
+      url: string;
+    }
+  }
+
+  export interface FindAllRetrieveParams {
+    /**
+     * Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  export interface FindAllCancelParams {
+    /**
+     * Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  export interface FindAllEnrichParams {
+    /**
+     * Body param: JSON schema for the enrichment output schema for the FindAll run.
+     */
+    output_schema: JsonSchema;
+
+    /**
+     * Body param: List of MCP servers to use for the task.
+     */
+    mcp_servers?: Array<McpServer> | null;
+
+    /**
+     * Body param: Processor to use for the task.
+     */
+    processor?: string;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  export interface FindAllEventsParams {
+    /**
+     * Query param
+     */
+    last_event_id?: string | null;
+
+    /**
+     * Query param
+     */
+    timeout?: number | null;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  export interface FindAllExtendParams {
+    /**
+     * Body param: Additional number of matches to find for this FindAll run. This
+     * value will be added to the current match limit to determine the new total match
+     * limit. Must be greater than 0.
+     */
+    additional_match_limit: number;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  export interface FindAllIngestParams {
+    /**
+     * Body param: Natural language objective to create a FindAll run spec.
+     */
+    objective: string;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  export interface FindAllResultParams {
+    /**
+     * Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  export interface FindAllSchemaParams {
+    /**
+     * Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
   }
 }
-
-export interface FindAllRetrieveParams {
-  /**
-   * Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-export interface FindAllCancelParams {
-  /**
-   * Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-export interface FindAllEnrichParams {
-  /**
-   * Body param: JSON schema for the enrichment output schema for the FindAll run.
-   */
-  output_schema: JsonSchema;
-
-  /**
-   * Body param: List of MCP servers to use for the task.
-   */
-  mcp_servers?: Array<McpServer> | null;
-
-  /**
-   * Body param: Processor to use for the task.
-   */
-  processor?: string;
-
-  /**
-   * Header param: Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-export interface FindAllEventsParams {
-  /**
-   * Query param:
-   */
-  last_event_id?: string | null;
-
-  /**
-   * Query param:
-   */
-  timeout?: number | null;
-
-  /**
-   * Header param: Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-export interface FindAllExtendParams {
-  /**
-   * Body param: Additional number of matches to find for this FindAll run. This
-   * value will be added to the current match limit to determine the new total match
-   * limit. Must be greater than 0.
-   */
-  additional_match_limit: number;
-
-  /**
-   * Header param: Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-export interface FindAllIngestParams {
-  /**
-   * Body param: Natural language objective to create a FindAll run spec.
-   */
-  objective: string;
-
-  /**
-   * Header param: Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-export interface FindAllResultParams {
-  /**
-   * Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-export interface FindAllSchemaParams {
-  /**
-   * Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<ParallelBeta>;
-}
-
-/* =========================================
- * Backwards-compatible aliases (deprecated)
- * ========================================= */
-
-export class Findall extends FindAll {}
-/** @deprecated Use `FindAllCandidateMatchStatusEvent` instead. */
-export type FindallCandidateMatchStatusEvent = FindAllCandidateMatchStatusEvent;
-/** @deprecated Use `FindAllEnrichInput` instead. */
-export type FindallEnrichInput = FindAllEnrichInput;
-/** @deprecated Use `FindAllExtendInput` instead. */
-export type FindallExtendInput = FindAllExtendInput;
-/** @deprecated Use `FindAllRun` instead. */
-export type FindallRun = FindAllRun;
-/** @deprecated Use `FindAllRunInput` instead. */
-export type FindallRunInput = FindAllRunInput;
-/** @deprecated Use `FindAllRunResult` instead. */
-export type FindallRunResult = FindAllRunResult;
-/** @deprecated Use `FindAllRunStatusEvent` instead. */
-export type FindallRunStatusEvent = FindAllRunStatusEvent;
-/** @deprecated Use `FindAllSchema` instead. */
-export type FindallSchema = FindAllSchema;
-/** @deprecated Use `FindAllSchemaUpdatedEvent` instead. */
-export type FindallSchemaUpdatedEvent = FindAllSchemaUpdatedEvent;
-/** @deprecated Use `IngestInput` instead. */
-export type FindallIngestInput = IngestInput;
-/** @deprecated Use `FindAllCancelResponse` instead. */
-export type FindallCancelResponse = FindAllCancelResponse;
-/** @deprecated Use `FindAllEventsResponse` instead. */
-export type FindallEventsResponse = FindAllEventsResponse;
-/** @deprecated Use `FindAllCreateParams` instead. */
-export type FindallCreateParams = FindAllCreateParams;
-/** @deprecated Use `FindAllRetrieveParams` instead. */
-export type FindallRetrieveParams = FindAllRetrieveParams;
-/** @deprecated Use `FindAllCancelParams` instead. */
-export type FindallCancelParams = FindAllCancelParams;
-/** @deprecated Use `FindAllEnrichParams` instead. */
-export type FindallEnrichParams = FindAllEnrichParams;
-/** @deprecated Use `FindAllEventsParams` instead. */
-export type FindallEventsParams = FindAllEventsParams;
-/** @deprecated Use `FindAllExtendParams` instead. */
-export type FindallExtendParams = FindAllExtendParams;
-/** @deprecated Use `FindAllIngestParams` instead. */
-export type FindallIngestParams = FindAllIngestParams;
-/** @deprecated Use `FindAllResultParams` instead. */
-export type FindallResultParams = FindAllResultParams;
-/** @deprecated Use `FindAllSchemaParams` instead. */
-export type FindallSchemaParams = FindAllSchemaParams;
 
 /* =========================================
  * Client
@@ -2494,7 +2515,7 @@ export interface ClientOptions {
    * Additional `RequestInit` options to be passed to `fetch` calls.
    * Properties will be overridden by per-request `fetchOptions`.
    */
-  fetchOptions?: Partial<RequestInit> | undefined;
+  fetchOptions?: RequestInit | undefined;
 
   /**
    * Specify a custom `fetch` function implementation.
@@ -2546,19 +2567,7 @@ export interface ClientOptions {
  * API Client for interfacing with the Parallel API.
  */
 export default class Parallel {
-  /**
-   * API Client for interfacing with the Parallel API.
-   *
-   * @param {string | undefined} [opts.apiKey=process.env['PARALLEL_API_KEY'] ?? undefined]
-   * @param {string} [opts.baseURL=process.env['PARALLEL_BASE_URL'] ?? https://api.parallel.ai] - Override the default base URL for the API.
-   * @param {number} [opts.timeout=1 minute] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
-   * @param {MergedRequestInit} [opts.fetchOptions] - Additional `RequestInit` options to be passed to `fetch` calls.
-   * @param {Fetch} [opts.fetch] - Specify a custom `fetch` function implementation.
-   * @param {number} [opts.maxRetries=2] - The maximum number of times the client will retry a request.
-   * @param {HeadersLike} opts.defaultHeaders - Default headers to include with every request to the API.
-   * @param {Record<string, string | undefined>} opts.defaultQuery - Default query parameters to include with every request to the API.
-   */
-  constructor(opts?: ClientOptions);
+  constructor(options?: ClientOptions);
 
   apiKey: string;
   baseURL: string;
@@ -2566,22 +2575,23 @@ export default class Parallel {
   timeout: number;
   logger: Logger;
   logLevel: LogLevel | undefined;
+  fetchOptions: RequestInit | undefined;
 
   /**
    * Create a new client instance re-using the same options given to the current client with optional overriding.
    */
   withOptions(options: Partial<ClientOptions>): this;
 
-  get<Rsp>(path: string, opts?: Promise<Parallel.RequestOptions> | Parallel.RequestOptions): APIPromise<Rsp>;
-  post<Rsp>(path: string, opts?: Promise<Parallel.RequestOptions> | Parallel.RequestOptions): APIPromise<Rsp>;
-  patch<Rsp>(path: string, opts?: Promise<Parallel.RequestOptions> | Parallel.RequestOptions): APIPromise<Rsp>;
-  put<Rsp>(path: string, opts?: Promise<Parallel.RequestOptions> | Parallel.RequestOptions): APIPromise<Rsp>;
-  delete<Rsp>(path: string, opts?: Promise<Parallel.RequestOptions> | Parallel.RequestOptions): APIPromise<Rsp>;
+  get<Rsp>(path: string, opts?: Parallel.RequestOptions | Promise<Parallel.RequestOptions>): APIPromise<Rsp>;
+  post<Rsp>(path: string, opts?: Parallel.RequestOptions | Promise<Parallel.RequestOptions>): APIPromise<Rsp>;
+  patch<Rsp>(path: string, opts?: Parallel.RequestOptions | Promise<Parallel.RequestOptions>): APIPromise<Rsp>;
+  put<Rsp>(path: string, opts?: Parallel.RequestOptions | Promise<Parallel.RequestOptions>): APIPromise<Rsp>;
+  delete<Rsp>(path: string, opts?: Parallel.RequestOptions | Promise<Parallel.RequestOptions>): APIPromise<Rsp>;
 
   taskRun: TaskRun;
   beta: Beta;
 
-  static DEFAULT_TIMEOUT: 60000;
+  static DEFAULT_TIMEOUT: number;
 
   static ParallelError: typeof ParallelError;
   static APIError: typeof APIError;
@@ -2598,7 +2608,6 @@ export default class Parallel {
   static UnprocessableEntityError: typeof UnprocessableEntityError;
 
   static toFile: typeof toFile;
-
   static Beta: typeof Beta;
 }
 
@@ -2653,7 +2662,7 @@ export declare namespace Parallel {
      * Additional `RequestInit` options to be passed to the underlying `fetch` call.
      * These options will be merged with the client's default fetch options.
      */
-    fetchOptions?: Partial<RequestInit>;
+    fetchOptions?: RequestInit;
 
     /**
      * An AbortSignal that can be used to cancel the request.
@@ -2674,27 +2683,27 @@ export declare namespace Parallel {
     __streamClass?: typeof Stream;
   };
 
+  export type TaskRun = TaskRunObject;
+  export type AutoSchema = import('./parallel-sdk-footprint').AutoSchema;
+  export type Citation = import('./parallel-sdk-footprint').Citation;
+  export type FieldBasis = import('./parallel-sdk-footprint').FieldBasis;
+  export type JsonSchema = import('./parallel-sdk-footprint').JsonSchema;
+  export type RunInput = import('./parallel-sdk-footprint').RunInput;
+  export type TaskRunJsonOutput = import('./parallel-sdk-footprint').TaskRunJsonOutput;
+  export type TaskRunResult = import('./parallel-sdk-footprint').TaskRunResult;
+  export type TaskRunTextOutput = import('./parallel-sdk-footprint').TaskRunTextOutput;
+  export type TaskSpec = import('./parallel-sdk-footprint').TaskSpec;
+  export type TextSchema = import('./parallel-sdk-footprint').TextSchema;
+  export type TaskRunCreateParams = import('./parallel-sdk-footprint').TaskRunCreateParams;
+  export type TaskRunResultParams = import('./parallel-sdk-footprint').TaskRunResultParams;
+
   export type ErrorObject = import('./parallel-sdk-footprint').ErrorObject;
   export type ErrorResponse = import('./parallel-sdk-footprint').ErrorResponse;
   export type SourcePolicy = import('./parallel-sdk-footprint').SourcePolicy;
   export type Warning = import('./parallel-sdk-footprint').Warning;
 
-  export {
-    TaskRunObject as TaskRun,
-    AutoSchema,
-    Citation,
-    FieldBasis,
-    JsonSchema,
-    RunInput,
-    TaskRunJsonOutput,
-    TaskRunResult,
-    TaskRunTextOutput,
-    TaskSpec,
-    TextSchema,
-    TaskRunCreateParams,
-    TaskRunResultParams,
-  };
-
   export { Beta };
 }
 ```
+
+If you want, I can also produce a second “LLM-friendly” variant that **removes TS-only noise** (like `import('./parallel-sdk-footprint')` self-references, `HeadersInit` vs `HeadersLike`, etc.) and instead presents the API as a compact interface map (client → resources → endpoints), while still embedding the original doc-comments verbatim.
