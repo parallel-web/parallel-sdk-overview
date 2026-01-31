@@ -1,1041 +1,507 @@
-Below is a **single consolidated `.d.ts`** that captures the **public footprint** of the SDK as shown in your tree. I only included the pieces that are *publicly importable* from the package entrypoint (`/src/index.ts`) and the public resource surface (`/src/resources/**`), plus the public “core” modules that are exported (e.g. `APIPromise`, streaming, errors, uploads, `APIResource`). I copied doc-comments **1:1 where present** (and omitted internal-only types/modules under `/src/internal/**`, except where a public type references an internal-shaped type—those are represented minimally).
-
-> Filename suggestion: `parallel-sdk-footprint.d.ts`
-
 ```ts
-// Type definitions for Parallel SDK (summarized public footprint)
-// Project: parallel-sdk-typescript
-// Definitions by: (generated)
-// NOTE: This file is a consolidated view of the public API surface for LLM consumption.
+// parallel-sdk-footprint.d.ts
+// Summarized public TypeScript declaration footprint for the SDK.
+//
+// Notes:
+// - This is a single-file “API surface” view intended for LLM/tooling consumption.
+// - Doc-comments are copied 1:1 where present in the source excerpts.
+// - Internal modules are intentionally not exposed (they are not importable outside the package).
 
-/* =========================================
- * Version
- * ========================================= */
+declare module 'parallel' {
+  export { Parallel as default } from './client';
 
-export const VERSION: '0.3.1'; // x-release-please-version
-
-/* =========================================
- * Core: Errors
- * ========================================= */
-
-export class ParallelError extends Error {}
-
-export class APIError<
-  TStatus extends number | undefined = number | undefined,
-  THeaders extends Headers | undefined = Headers | undefined,
-  TError extends Object | undefined = Object | undefined,
-> extends ParallelError {
-  /** HTTP status for the response that caused the error */
-  readonly status: TStatus;
-  /** HTTP headers for the response that caused the error */
-  readonly headers: THeaders;
-  /** JSON body of the response that caused the error */
-  readonly error: TError;
-
-  constructor(status: TStatus, error: TError, message: string | undefined, headers: THeaders);
-
-  static generate(
-    status: number | undefined,
-    errorResponse: Object | undefined,
-    message: string | undefined,
-    headers: Headers | undefined,
-  ): APIError;
+  export { type Uploadable, toFile } from './core/uploads';
+  export { APIPromise } from './core/api-promise';
+  export { Parallel, type ClientOptions } from './client';
+  export {
+    ParallelError,
+    APIError,
+    APIConnectionError,
+    APIConnectionTimeoutError,
+    APIUserAbortError,
+    NotFoundError,
+    ConflictError,
+    RateLimitError,
+    BadRequestError,
+    AuthenticationError,
+    InternalServerError,
+    PermissionDeniedError,
+    UnprocessableEntityError,
+  } from './core/error';
 }
 
-export class APIUserAbortError extends APIError<undefined, undefined, undefined> {
-  constructor({ message }?: { message?: string });
+declare module 'parallel/version' {
+  export const VERSION: '0.3.1';
 }
 
-export class APIConnectionError extends APIError<undefined, undefined, undefined> {
-  constructor({ message, cause }: { message?: string | undefined; cause?: Error | undefined });
+declare module 'parallel/core/uploads' {
+  export { type Uploadable } from '../internal/uploads';
+  export { toFile, type ToFileInput } from '../internal/to-file';
 }
 
-export class APIConnectionTimeoutError extends APIConnectionError {
-  constructor({ message }?: { message?: string });
-}
+declare module 'parallel/core/api-promise' {
+  import { type Parallel } from '../client';
 
-export class BadRequestError extends APIError<400, Headers> {}
-export class AuthenticationError extends APIError<401, Headers> {}
-export class PermissionDeniedError extends APIError<403, Headers> {}
-export class NotFoundError extends APIError<404, Headers> {}
-export class ConflictError extends APIError<409, Headers> {}
-export class UnprocessableEntityError extends APIError<422, Headers> {}
-export class RateLimitError extends APIError<429, Headers> {}
-export class InternalServerError extends APIError<number, Headers> {}
-
-/* =========================================
- * Core: APIResource
- * ========================================= */
-
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
-export abstract class APIResource {
-  protected _client: Parallel;
-  constructor(client: Parallel);
-}
-
-/* =========================================
- * Core: APIPromise
- * ========================================= */
-
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
-export class APIPromise<T> extends Promise<T> {
-  constructor(
-    client: Parallel,
-    responsePromise: Promise<{
-      response: Response;
-      options: Parallel.RequestOptions & { method: any; path: string };
-      controller: AbortController;
-      requestLogID: string;
-      retryOfRequestLogID: string | undefined;
-      startTime: number;
-    }>,
-    parseResponse?: (
-      client: Parallel,
-      props: {
-        response: Response;
-        options: Parallel.RequestOptions & { method: any; path: string };
-        controller: AbortController;
-        requestLogID: string;
-        retryOfRequestLogID: string | undefined;
-        startTime: number;
-      },
-    ) => T | Promise<T>,
-  );
-
-  /**
-   * Gets the raw `Response` instance instead of parsing the response
-   * data.
-   *
-   * If you want to parse the response body but still get the `Response`
-   * instance, you can use {@link withResponse()}.
-   *
-   * 👋 Getting the wrong TypeScript type for `Response`?
-   * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
-   * to your `tsconfig.json`.
-   */
-  asResponse(): Promise<Response>;
-
-  /**
-   * Gets the parsed response data and the raw `Response` instance.
-   *
-   * If you just want to get the raw `Response` instance without parsing it,
-   * you can use {@link asResponse()}.
-   *
-   * 👋 Getting the wrong TypeScript type for `Response`?
-   * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
-   * to your `tsconfig.json`.
-   */
-  withResponse(): Promise<{ data: T; response: Response }>;
-}
-
-/* =========================================
- * Core: Streaming
- * ========================================= */
-
-export type ServerSentEvent = {
-  event: string | null;
-  data: string;
-  raw: string[];
-};
-
-export class Stream<Item> implements AsyncIterable<Item> {
-  controller: AbortController;
-
-  constructor(iterator: () => AsyncIterator<Item>, controller: AbortController, client?: Parallel);
-
-  static fromSSEResponse<Item>(response: Response, controller: AbortController, client?: Parallel): Stream<Item>;
-
-  /**
-   * Generates a Stream from a newline-separated ReadableStream
-   * where each item is a JSON value.
-   */
-  static fromReadableStream<Item>(
-    readableStream: ReadableStream,
-    controller: AbortController,
-    client?: Parallel,
-  ): Stream<Item>;
-
-  [Symbol.asyncIterator](): AsyncIterator<Item>;
-
-  /**
-   * Splits the stream into two streams which can be
-   * independently read from at different speeds.
-   */
-  tee(): [Stream<Item>, Stream<Item>];
-
-  /**
-   * Converts this stream to a newline-separated ReadableStream of
-   * JSON stringified values in the stream
-   * which can be turned back into a Stream with `Stream.fromReadableStream()`.
-   */
-  toReadableStream(): ReadableStream;
-}
-
-/* =========================================
- * Core: Uploads
- * ========================================= */
-
-export type Uploadable = File | Response | (AsyncIterable<Uint8Array> & { path: string | { toString(): string } }) | Blob;
-
-/* Copied doc-comment 1:1 from src/internal/to-file.ts */
-/**
- * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
- * @param value the raw content of the file. Can be an {@link Uploadable}, BlobLikePart, or AsyncIterable of BlobLikeParts
- * @param {string=} name the name of the file. If omitted, toFile will try to determine a file name from bits if possible
- * @param {Object=} options additional properties
- * @param {string=} options.type the MIME type of the content
- * @param {number=} options.lastModified the last modified timestamp
- * @returns a {@link File} with the given properties
- */
-export function toFile(
-  value:
-    | File
-    | Response
-    | Exclude<string | ArrayBuffer | ArrayBufferView | Blob | DataView, string>
-    | AsyncIterable<string | ArrayBuffer | ArrayBufferView | Blob | DataView>
-    | PromiseLike<
-        | File
-        | Response
-        | Exclude<string | ArrayBuffer | ArrayBufferView | Blob | DataView, string>
-        | AsyncIterable<string | ArrayBuffer | ArrayBufferView | Blob | DataView>
-      >,
-  name?: string | null | undefined,
-  options?: { type?: string; lastModified?: number } | undefined,
-): Promise<File>;
-
-export type ToFileInput =
-  | File
-  | { url: string; blob(): Promise<any> }
-  | Exclude<string | ArrayBuffer | ArrayBufferView | Blob | DataView, string>
-  | AsyncIterable<string | ArrayBuffer | ArrayBufferView | Blob | DataView>;
-
-/* =========================================
- * Resources: Shared
- * ========================================= */
-
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
-/**
- * An error message.
- */
-export interface ErrorObject {
-  /**
-   * Human-readable message.
-   */
-  message: string;
-
-  /**
-   * Reference ID for the error.
-   */
-  ref_id: string;
-
-  /**
-   * Optional detail supporting the error.
-   */
-  detail?: { [key: string]: unknown } | null;
-}
-
-/**
- * Response object used for non-200 status codes.
- */
-export interface ErrorResponse {
-  /**
-   * Error.
-   */
-  error: ErrorObject;
-
-  /**
-   * Always 'error'.
-   */
-  type: 'error';
-}
-
-/**
- * Source policy for web search results.
- *
- * This policy governs which sources are allowed/disallowed in results.
- */
-export interface SourcePolicy {
-  /**
-   * Optional start date for filtering search results. Results will be limited to
-   * content published on or after this date. Provided as an RFC 3339 date string
-   * (YYYY-MM-DD).
-   */
-  after_date?: string | null;
-
-  /**
-   * List of domains to exclude from results. If specified, sources from these
-   * domains will be excluded. Accepts plain domains (e.g., example.com,
-   * subdomain.example.gov) or bare domain extension starting with a period (e.g.,
-   * .gov, .edu, .co.uk).
-   */
-  exclude_domains?: Array<string>;
-
-  /**
-   * List of domains to restrict the results to. If specified, only sources from
-   * these domains will be included. Accepts plain domains (e.g., example.com,
-   * subdomain.example.gov) or bare domain extension starting with a period (e.g.,
-   * .gov, .edu, .co.uk).
-   */
-  include_domains?: Array<string>;
-}
-
-/**
- * Human-readable message for a task.
- */
-export interface Warning {
-  /**
-   * Human-readable message.
-   */
-  message: string;
-
-  /**
-   * Type of warning. Note that adding new warning types is considered a
-   * backward-compatible change.
-   */
-  type: 'spec_validation_warning' | 'input_validation_warning' | 'warning';
-
-  /**
-   * Optional detail supporting the warning.
-   */
-  detail?: { [key: string]: unknown } | null;
-}
-
-/* =========================================
- * Resources: TaskRun (stable)
- * ========================================= */
-
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
-export class TaskRun extends APIResource {
-  /**
-   * Initiates a task run.
-   *
-   * Returns immediately with a run object in status 'queued'.
-   *
-   * Beta features can be enabled by setting the 'parallel-beta' header.
-   */
-  create(body: TaskRunCreateParams, options?: Parallel.RequestOptions): APIPromise<TaskRun.TaskRun>;
-
-  /**
-   * Retrieves run status by run_id.
-   *
-   * The run result is available from the `/result` endpoint.
-   */
-  retrieve(runID: string, options?: Parallel.RequestOptions): APIPromise<TaskRun.TaskRun>;
-
-  /**
-   * Retrieves a run result by run_id, blocking until the run is completed.
-   */
-  result(
-    runID: string,
-    query?: TaskRunResultParams | null | undefined,
-    options?: Parallel.RequestOptions,
-  ): APIPromise<TaskRunResult>;
-}
-
-/**
- * Auto schema for a task input or output.
- */
-export interface AutoSchema {
-  /**
-   * The type of schema being defined. Always `auto`.
-   */
-  type?: 'auto';
-}
-
-/**
- * A citation for a task output.
- */
-export interface Citation {
-  /**
-   * URL of the citation.
-   */
-  url: string;
-
-  /**
-   * Excerpts from the citation supporting the output. Only certain processors
-   * provide excerpts.
-   */
-  excerpts?: Array<string> | null;
-
-  /**
-   * Title of the citation.
-   */
-  title?: string | null;
-}
-
-/**
- * Citations and reasoning supporting one field of a task output.
- */
-export interface FieldBasis {
-  /**
-   * Name of the output field.
-   */
-  field: string;
-
-  /**
-   * Reasoning for the output field.
-   */
-  reasoning: string;
-
-  /**
-   * List of citations supporting the output field.
-   */
-  citations?: Array<Citation>;
-
-  /**
-   * Confidence level for the output field. Only certain processors provide
-   * confidence levels.
-   */
-  confidence?: string | null;
-}
-
-/**
- * JSON schema for a task input or output.
- */
-export interface JsonSchema {
-  /**
-   * A JSON Schema object. Only a subset of JSON Schema is supported.
-   */
-  json_schema: { [key: string]: unknown };
-
-  /**
-   * The type of schema being defined. Always `json`.
-   */
-  type?: 'json';
-}
-
-/**
- * Request to run a task.
- */
-export interface RunInput {
-  /**
-   * Input to the task, either text or a JSON object.
-   */
-  input: string | { [key: string]: unknown };
-
-  /**
-   * Processor to use for the task.
-   */
-  processor: string;
-
-  /**
-   * User-provided metadata stored with the run. Keys and values must be strings with
-   * a maximum length of 16 and 512 characters respectively.
-   */
-  metadata?: { [key: string]: string | number | boolean } | null;
-
-  /**
-   * Source policy for web search results.
-   *
-   * This policy governs which sources are allowed/disallowed in results.
-   */
-  source_policy?: SourcePolicy | null;
-
-  /**
-   * Specification for a task.
-   *
-   * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
-   * Not specifying a TaskSpec is the same as setting an auto output schema.
-   *
-   * For convenience bare strings are also accepted as input or output schemas.
-   */
-  task_spec?: TaskSpec | null;
-}
-
-/**
- * Status of a task run.
- */
-export interface TaskRunObject {
-  /**
-   * Timestamp of the creation of the task, as an RFC 3339 string.
-   */
-  created_at: string | null;
-
-  /**
-   * Whether the run is currently active, i.e. status is one of {'cancelling',
-   * 'queued', 'running'}.
-   */
-  is_active: boolean;
-
-  /**
-   * Timestamp of the last modification to the task, as an RFC 3339 string.
-   */
-  modified_at: string | null;
-
-  /**
-   * Processor used for the run.
-   */
-  processor: string;
-
-  /**
-   * ID of the task run.
-   */
-  run_id: string;
-
-  /**
-   * Status of the run.
-   */
-  status: 'queued' | 'action_required' | 'running' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
-
-  /**
-   * An error message.
-   */
-  error?: ErrorObject | null;
-
-  /**
-   * User-provided metadata stored with the run.
-   */
-  metadata?: { [key: string]: string | number | boolean } | null;
-
-  /**
-   * ID of the taskgroup to which the run belongs.
-   */
-  taskgroup_id?: string | null;
-
-  /**
-   * Warnings for the run, if any.
-   */
-  warnings?: Array<Warning> | null;
-}
-
-/**
- * Output from a task that returns JSON.
- */
-export interface TaskRunJsonOutput {
-  /**
-   * Basis for each top-level field in the JSON output. Per-list-element basis
-   * entries are available only when the `parallel-beta: field-basis-2025-11-25`
-   * header is supplied.
-   */
-  basis: Array<FieldBasis>;
-
-  /**
-   * Output from the task as a native JSON object, as determined by the output schema
-   * of the task spec.
-   */
-  content: { [key: string]: unknown };
-
-  /**
-   * The type of output being returned, as determined by the output schema of the
-   * task spec.
-   */
-  type: 'json';
-
-  /**
-   * Additional fields from beta features used in this task run. When beta features
-   * are specified during both task run creation and result retrieval, this field
-   * will be empty and instead the relevant beta attributes will be directly included
-   * in the `BetaTaskRunJsonOutput` or corresponding output type. However, if beta
-   * features were specified during task run creation but not during result
-   * retrieval, this field will contain the dump of fields from those beta features.
-   * Each key represents the beta feature version (one amongst parallel-beta headers)
-   * and the values correspond to the beta feature attributes, if any. For now, only
-   * MCP server beta features have attributes. For example,
-   * `{mcp-server-2025-07-17: [{'server_name':'mcp_server', 'tool_call_id': 'tc_123', ...}]}}`
-   */
-  beta_fields?: { [key: string]: unknown } | null;
-
-  /**
-   * Output schema for the Task Run. Populated only if the task was executed with an
-   * auto schema.
-   */
-  output_schema?: { [key: string]: unknown } | null;
-}
-
-/**
- * Result of a task run.
- */
-export interface TaskRunResult {
-  /**
-   * Output from the task conforming to the output schema.
-   */
-  output: TaskRunTextOutput | TaskRunJsonOutput;
-
-  /**
-   * Task run object with status 'completed'.
-   */
-  run: TaskRunObject;
-}
-
-/**
- * Output from a task that returns text.
- */
-export interface TaskRunTextOutput {
-  /**
-   * Basis for the output. The basis has a single field 'output'.
-   */
-  basis: Array<FieldBasis>;
-
-  /**
-   * Text output from the task.
-   */
-  content: string;
-
-  /**
-   * The type of output being returned, as determined by the output schema of the
-   * task spec.
-   */
-  type: 'text';
-
-  /**
-   * Additional fields from beta features used in this task run. When beta features
-   * are specified during both task run creation and result retrieval, this field
-   * will be empty and instead the relevant beta attributes will be directly included
-   * in the `BetaTaskRunJsonOutput` or corresponding output type. However, if beta
-   * features were specified during task run creation but not during result
-   * retrieval, this field will contain the dump of fields from those beta features.
-   * Each key represents the beta feature version (one amongst parallel-beta headers)
-   * and the values correspond to the beta feature attributes, if any. For now, only
-   * MCP server beta features have attributes. For example,
-   * `{mcp-server-2025-07-17: [{'server_name':'mcp_server', 'tool_call_id': 'tc_123', ...}]}}`
-   */
-  beta_fields?: { [key: string]: unknown } | null;
-}
-
-/**
- * Specification for a task.
- *
- * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
- * Not specifying a TaskSpec is the same as setting an auto output schema.
- *
- * For convenience bare strings are also accepted as input or output schemas.
- */
-export interface TaskSpec {
-  /**
-   * JSON schema or text fully describing the desired output from the task.
-   * Descriptions of output fields will determine the form and content of the
-   * response. A bare string is equivalent to a text schema with the same
-   * description.
-   */
-  output_schema: JsonSchema | TextSchema | AutoSchema | string;
-
-  /**
-   * Optional JSON schema or text description of expected input to the task. A bare
-   * string is equivalent to a text schema with the same description.
-   */
-  input_schema?: string | JsonSchema | TextSchema | null;
-}
-
-/**
- * Text description for a task input or output.
- */
-export interface TextSchema {
-  /**
-   * A text description of the desired output from the task.
-   */
-  description?: string | null;
-
-  /**
-   * The type of schema being defined. Always `text`.
-   */
-  type?: 'text';
-}
-
-export interface TaskRunCreateParams {
-  /**
-   * Input to the task, either text or a JSON object.
-   */
-  input: string | { [key: string]: unknown };
-
-  /**
-   * Processor to use for the task.
-   */
-  processor: string;
-
-  /**
-   * User-provided metadata stored with the run. Keys and values must be strings with
-   * a maximum length of 16 and 512 characters respectively.
-   */
-  metadata?: { [key: string]: string | number | boolean } | null;
-
-  /**
-   * Source policy for web search results.
-   *
-   * This policy governs which sources are allowed/disallowed in results.
-   */
-  source_policy?: SourcePolicy | null;
-
-  /**
-   * Specification for a task.
-   *
-   * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
-   * Not specifying a TaskSpec is the same as setting an auto output schema.
-   *
-   * For convenience bare strings are also accepted as input or output schemas.
-   */
-  task_spec?: TaskSpec | null;
-}
-
-export interface TaskRunResultParams {
-  timeout?: number;
-}
-
-export declare namespace TaskRun {
-  export type AutoSchema = import('./parallel-sdk-footprint').AutoSchema;
-  export type Citation = import('./parallel-sdk-footprint').Citation;
-  export type FieldBasis = import('./parallel-sdk-footprint').FieldBasis;
-  export type JsonSchema = import('./parallel-sdk-footprint').JsonSchema;
-  export type RunInput = import('./parallel-sdk-footprint').RunInput;
-  export type TaskRun = import('./parallel-sdk-footprint').TaskRunObject;
-  export type TaskRunJsonOutput = import('./parallel-sdk-footprint').TaskRunJsonOutput;
-  export type TaskRunResult = import('./parallel-sdk-footprint').TaskRunResult;
-  export type TaskRunTextOutput = import('./parallel-sdk-footprint').TaskRunTextOutput;
-  export type TaskSpec = import('./parallel-sdk-footprint').TaskSpec;
-  export type TextSchema = import('./parallel-sdk-footprint').TextSchema;
-  export type TaskRunCreateParams = import('./parallel-sdk-footprint').TaskRunCreateParams;
-  export type TaskRunResultParams = import('./parallel-sdk-footprint').TaskRunResultParams;
-}
-
-/* =========================================
- * Resources: Beta (Beta root + subresources)
- * ========================================= */
-
-// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
-
-export class Beta extends APIResource {
-  taskRun: Beta.TaskRun;
-  taskGroup: Beta.TaskGroup;
-  findall: Beta.FindAll;
-
-  /**
-   * Extracts relevant content from specific web URLs.
-   *
-   * To access this endpoint, pass the `parallel-beta` header with the value
-   * `search-extract-2025-10-10`.
-   */
-  extract(params: Beta.BetaExtractParams, options?: Parallel.RequestOptions): APIPromise<Beta.ExtractResponse>;
-
-  /**
-   * Searches the web.
-   *
-   * To access this endpoint, pass the `parallel-beta` header with the value
-   * `search-extract-2025-10-10`.
-   */
-  search(params: Beta.BetaSearchParams, options?: Parallel.RequestOptions): APIPromise<Beta.SearchResult>;
-}
-
-/**
- * Optional settings for returning relevant excerpts.
- */
-export interface ExcerptSettings {
-  /**
-   * Optional upper bound on the total number of characters to include per url.
-   * Excerpts may contain fewer characters than this limit to maximize relevance and
-   * token efficiency, but will never contain fewer than 1000 characters per result.
-   */
-  max_chars_per_result?: number | null;
-
-  /**
-   * Optional upper bound on the total number of characters to include across all
-   * urls. Results may contain fewer characters than this limit to maximize relevance
-   * and token efficiency, but will never contain fewer than 1000 characters per
-   * result.This overall limit applies in addition to max_chars_per_result.
-   */
-  max_chars_total?: number | null;
-}
-
-/**
- * Extract error details.
- */
-export interface ExtractError {
-  /**
-   * Content returned for http client or server errors, if any.
-   */
-  content: string | null;
-
-  /**
-   * Error type.
-   */
-  error_type: string;
-
-  /**
-   * HTTP status code, if available.
-   */
-  http_status_code: number | null;
-
-  url: string;
-}
-
-/**
- * Fetch result.
- */
-export interface ExtractResponse {
-  /**
-   * Extract errors: requested URLs not in the results.
-   */
-  errors: Array<ExtractError>;
-
-  /**
-   * Extract request ID, e.g. `extract_cad0a6d2dec046bd95ae900527d880e7`
-   */
-  extract_id: string;
-
-  /**
-   * Successful extract results.
-   */
-  results: Array<ExtractResult>;
-
-  /**
-   * Usage metrics for the extract request.
-   */
-  usage?: Array<UsageItem> | null;
-
-  /**
-   * Warnings for the extract request, if any.
-   */
-  warnings?: Array<Warning> | null;
-}
-
-/**
- * Extract result for a single URL.
- */
-export interface ExtractResult {
-  /**
-   * URL associated with the search result.
-   */
-  url: string;
-
-  /**
-   * Relevant excerpted content from the URL, formatted as markdown.
-   */
-  excerpts?: Array<string> | null;
-
-  /**
-   * Full content from the URL formatted as markdown, if requested.
-   */
-  full_content?: string | null;
-
-  /**
-   * Publish date of the webpage in YYYY-MM-DD format, if available.
-   */
-  publish_date?: string | null;
-
-  /**
-   * Title of the webpage, if available.
-   */
-  title?: string | null;
-}
-
-/**
- * Policy for live fetching web results.
- */
-export interface FetchPolicy {
-  /**
-   * If false, fallback to cached content older than max-age if live fetch fails or
-   * times out. If true, returns an error instead.
-   */
-  disable_cache_fallback?: boolean;
-
-  /**
-   * Maximum age of cached content in seconds to trigger a live fetch. Minimum value
-   * 600 seconds (10 minutes).
-   */
-  max_age_seconds?: number | null;
-
-  /**
-   * Timeout in seconds for fetching live content if unavailable in cache.
-   */
-  timeout_seconds?: number | null;
-}
-
-/**
- * Output for the Search API.
- */
-export interface SearchResult {
-  /**
-   * A list of WebSearchResult objects, ordered by decreasing relevance.
-   */
-  results: Array<WebSearchResult>;
-
-  /**
-   * Search ID. Example: `search_cad0a6d2dec046bd95ae900527d880e7`
-   */
-  search_id: string;
-
-  /**
-   * Usage metrics for the search request.
-   */
-  usage?: Array<UsageItem> | null;
-
-  /**
-   * Warnings for the search request, if any.
-   */
-  warnings?: Array<Warning> | null;
-}
-
-/**
- * Usage item for a single operation.
- */
-export interface UsageItem {
-  /**
-   * Count of the SKU.
-   */
-  count: number;
-
-  /**
-   * Name of the SKU.
-   */
-  name: string;
-}
-
-/**
- * A single search result from the web search API.
- */
-export interface WebSearchResult {
-  /**
-   * URL associated with the search result.
-   */
-  url: string;
-
-  /**
-   * Relevant excerpted content from the URL, formatted as markdown.
-   */
-  excerpts?: Array<string> | null;
-
-  /**
-   * Publish date of the webpage in YYYY-MM-DD format, if available.
-   */
-  publish_date?: string | null;
-
-  /**
-   * Title of the webpage, if available.
-   */
-  title?: string | null;
-}
-
-export interface BetaExtractParams {
-  /**
-   * Body param
-   */
-  urls: Array<string>;
-
-  /**
-   * Body param: Include excerpts from each URL relevant to the search objective and
-   * queries. Note that if neither objective nor search_queries is provided, excerpts
-   * are redundant with full content.
-   */
-  excerpts?: boolean | ExcerptSettings;
-
-  /**
-   * Body param: Policy for live fetching web results.
-   */
-  fetch_policy?: FetchPolicy | null;
-
-  /**
-   * Body param: Include full content from each URL. Note that if neither objective
-   * nor search_queries is provided, excerpts are redundant with full content.
-   */
-  full_content?: boolean | BetaExtractParams.FullContentSettings;
-
-  /**
-   * Body param: If provided, focuses extracted content on the specified search
-   * objective.
-   */
-  objective?: string | null;
-
-  /**
-   * Body param: If provided, focuses extracted content on the specified keyword
-   * search queries.
-   */
-  search_queries?: Array<string> | null;
-
-  /**
-   * Header param: Optional header to specify the beta version(s) to enable.
-   */
-  betas?: Array<Beta.ParallelBeta>;
-}
-
-export declare namespace BetaExtractParams {
   /**
-   * Optional settings for returning full content.
+   * A subclass of `Promise` providing additional helper methods
+   * for interacting with the SDK.
    */
-  export interface FullContentSettings {
+  export class APIPromise<T> extends Promise<T> {
     /**
-     * Optional limit on the number of characters to include in the full content for
-     * each url. Full content always starts at the beginning of the page and is
-     * truncated at the limit if necessary.
+     * Gets the raw `Response` instance instead of parsing the response
+     * data.
+     *
+     * If you want to parse the response body but still get the `Response`
+     * instance, you can use {@link withResponse()}.
+     *
+     * 👋 Getting the wrong TypeScript type for `Response`?
+     * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
+     * to your `tsconfig.json`.
      */
-    max_chars_per_result?: number | null;
+    asResponse(): Promise<Response>;
+
+    /**
+     * Gets the parsed response data and the raw `Response` instance.
+     *
+     * If you just want to get the raw `Response` instance without parsing it,
+     * you can use {@link asResponse()}.
+     *
+     * 👋 Getting the wrong TypeScript type for `Response`?
+     * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
+     * to your `tsconfig.json`.
+     */
+    withResponse(): Promise<{ data: T; response: Response }>;
   }
 }
 
-export interface BetaSearchParams {
-  /**
-   * Body param: Optional settings to configure excerpt generation.
-   */
-  excerpts?: ExcerptSettings;
+declare module 'parallel/core/resource' {
+  import type { Parallel } from '../client';
+
+  export abstract class APIResource {
+    protected _client: Parallel;
+    constructor(client: Parallel);
+  }
+}
+
+declare module 'parallel/core/error' {
+  export class ParallelError extends Error {}
+
+  export class APIError<
+    TStatus extends number | undefined = number | undefined,
+    THeaders extends Headers | undefined = Headers | undefined,
+    TError extends Object | undefined = Object | undefined,
+  > extends ParallelError {
+    /** HTTP status for the response that caused the error */
+    readonly status: TStatus;
+    /** HTTP headers for the response that caused the error */
+    readonly headers: THeaders;
+    /** JSON body of the response that caused the error */
+    readonly error: TError;
+  }
+
+  export class APIUserAbortError extends APIError<undefined, undefined, undefined> {}
+  export class APIConnectionError extends APIError<undefined, undefined, undefined> {}
+  export class APIConnectionTimeoutError extends APIConnectionError {}
+
+  export class BadRequestError extends APIError<400, Headers> {}
+  export class AuthenticationError extends APIError<401, Headers> {}
+  export class PermissionDeniedError extends APIError<403, Headers> {}
+  export class NotFoundError extends APIError<404, Headers> {}
+  export class ConflictError extends APIError<409, Headers> {}
+  export class UnprocessableEntityError extends APIError<422, Headers> {}
+  export class RateLimitError extends APIError<429, Headers> {}
+  export class InternalServerError extends APIError<number, Headers> {}
+}
+
+declare module 'parallel/core/streaming' {
+  import type { ReadableStream } from '../internal/shim-types';
+
+  export type ServerSentEvent = {
+    event: string | null;
+    data: string;
+    raw: string[];
+  };
+
+  export class Stream<Item> implements AsyncIterable<Item> {
+    controller: AbortController;
+
+    constructor(iterator: () => AsyncIterator<Item>, controller: AbortController, client?: any);
+
+    static fromSSEResponse<Item>(response: Response, controller: AbortController, client?: any): Stream<Item>;
+
+    /**
+     * Generates a Stream from a newline-separated ReadableStream
+     * where each item is a JSON value.
+     */
+    static fromReadableStream<Item>(
+      readableStream: ReadableStream,
+      controller: AbortController,
+      client?: any,
+    ): Stream<Item>;
+
+    [Symbol.asyncIterator](): AsyncIterator<Item>;
+
+    /**
+     * Splits the stream into two streams which can be
+     * independently read from at different speeds.
+     */
+    tee(): [Stream<Item>, Stream<Item>];
+
+    /**
+     * Converts this stream to a newline-separated ReadableStream of
+     * JSON stringified values in the stream
+     * which can be turned back into a Stream with `Stream.fromReadableStream()`.
+     */
+    toReadableStream(): ReadableStream;
+  }
+}
+
+declare module 'parallel/client' {
+  import type { MergedRequestInit } from './internal/types';
+  import type { Fetch } from './internal/builtin-types';
+  import type { HeadersLike } from './internal/headers';
+  import type { LogLevel, Logger } from './internal/utils/log';
+
+  import * as API from './resources/index';
+
+  export interface ClientOptions {
+    /**
+     * Defaults to process.env['PARALLEL_API_KEY'].
+     */
+    apiKey?: string | undefined;
+
+    /**
+     * Override the default base URL for the API, e.g., "https://api.example.com/v2/"
+     *
+     * Defaults to process.env['PARALLEL_BASE_URL'].
+     */
+    baseURL?: string | null | undefined;
+
+    /**
+     * The maximum amount of time (in milliseconds) that the client should wait for a response
+     * from the server before timing out a single request.
+     *
+     * Note that request timeouts are retried by default, so in a worst-case scenario you may wait
+     * much longer than this timeout before the promise succeeds or fails.
+     *
+     * @unit milliseconds
+     */
+    timeout?: number | undefined;
+
+    /**
+     * Additional `RequestInit` options to be passed to `fetch` calls.
+     * Properties will be overridden by per-request `fetchOptions`.
+     */
+    fetchOptions?: MergedRequestInit | undefined;
+
+    /**
+     * Specify a custom `fetch` function implementation.
+     *
+     * If not provided, we expect that `fetch` is defined globally.
+     */
+    fetch?: Fetch | undefined;
+
+    /**
+     * The maximum number of times that the client will retry a request in case of a
+     * temporary failure, like a network error or a 5XX error from the server.
+     *
+     * @default 2
+     */
+    maxRetries?: number | undefined;
+
+    /**
+     * Default headers to include with every request to the API.
+     *
+     * These can be removed in individual requests by explicitly setting the
+     * header to `null` in request options.
+     */
+    defaultHeaders?: HeadersLike | undefined;
+
+    /**
+     * Default query parameters to include with every request to the API.
+     *
+     * These can be removed in individual requests by explicitly setting the
+     * param to `undefined` in request options.
+     */
+    defaultQuery?: Record<string, string | undefined> | undefined;
+
+    /**
+     * Set the log level.
+     *
+     * Defaults to process.env['PARALLEL_LOG'] or 'warn' if it isn't set.
+     */
+    logLevel?: LogLevel | undefined;
+
+    /**
+     * Set the logger.
+     *
+     * Defaults to globalThis.console.
+     */
+    logger?: Logger | undefined;
+  }
 
   /**
-   * Body param: Policy for live fetching web results.
+   * API Client for interfacing with the Parallel API.
    */
-  fetch_policy?: FetchPolicy | null;
+  export class Parallel {
+    apiKey: string;
+    baseURL: string;
+    maxRetries: number;
+    timeout: number;
+    logger: Logger;
+    logLevel: LogLevel | undefined;
+    fetchOptions: MergedRequestInit | undefined;
+
+    /**
+     * API Client for interfacing with the Parallel API.
+     *
+     * @param {string | undefined} [opts.apiKey=process.env['PARALLEL_API_KEY'] ?? undefined]
+     * @param {string} [opts.baseURL=process.env['PARALLEL_BASE_URL'] ?? https://api.parallel.ai] - Override the default base URL for the API.
+     * @param {number} [opts.timeout=1 minute] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
+     * @param {MergedRequestInit} [opts.fetchOptions] - Additional `RequestInit` options to be passed to `fetch` calls.
+     * @param {Fetch} [opts.fetch] - Specify a custom `fetch` function implementation.
+     * @param {number} [opts.maxRetries=2] - The maximum number of times the client will retry a request.
+     * @param {HeadersLike} opts.defaultHeaders - Default headers to include with every request to the API.
+     * @param {Record<string, string | undefined>} opts.defaultQuery - Default query parameters to include with every request to the API.
+     */
+    constructor(opts?: ClientOptions);
+
+    /**
+     * Create a new client instance re-using the same options given to the current client with optional overriding.
+     */
+    withOptions(options: Partial<ClientOptions>): this;
+
+    get<Rsp>(path: string, opts?: Parallel.RequestOptions | PromiseLike<Parallel.RequestOptions>): import('./core/api-promise').APIPromise<Rsp>;
+    post<Rsp>(path: string, opts?: Parallel.RequestOptions | PromiseLike<Parallel.RequestOptions>): import('./core/api-promise').APIPromise<Rsp>;
+    patch<Rsp>(path: string, opts?: Parallel.RequestOptions | PromiseLike<Parallel.RequestOptions>): import('./core/api-promise').APIPromise<Rsp>;
+    put<Rsp>(path: string, opts?: Parallel.RequestOptions | PromiseLike<Parallel.RequestOptions>): import('./core/api-promise').APIPromise<Rsp>;
+    delete<Rsp>(path: string, opts?: Parallel.RequestOptions | PromiseLike<Parallel.RequestOptions>): import('./core/api-promise').APIPromise<Rsp>;
+
+    // Top-level resources
+    taskRun: API.TaskRun;
+    beta: API.Beta;
+
+    // Static re-exports (error classes + toFile)
+    static DEFAULT_TIMEOUT: number;
+    static ParallelError: typeof import('./core/error').ParallelError;
+    static APIError: typeof import('./core/error').APIError;
+    static APIConnectionError: typeof import('./core/error').APIConnectionError;
+    static APIConnectionTimeoutError: typeof import('./core/error').APIConnectionTimeoutError;
+    static APIUserAbortError: typeof import('./core/error').APIUserAbortError;
+    static NotFoundError: typeof import('./core/error').NotFoundError;
+    static ConflictError: typeof import('./core/error').ConflictError;
+    static RateLimitError: typeof import('./core/error').RateLimitError;
+    static BadRequestError: typeof import('./core/error').BadRequestError;
+    static AuthenticationError: typeof import('./core/error').AuthenticationError;
+    static InternalServerError: typeof import('./core/error').InternalServerError;
+    static PermissionDeniedError: typeof import('./core/error').PermissionDeniedError;
+    static UnprocessableEntityError: typeof import('./core/error').UnprocessableEntityError;
+
+    static toFile: typeof import('./core/uploads').toFile;
+    static Beta: typeof API.Beta;
+    static Parallel: typeof Parallel;
+  }
+
+  export declare namespace Parallel {
+    export type RequestOptions = import('./internal/request-options').RequestOptions;
+
+    export {
+      type TaskRun,
+      type AutoSchema,
+      type Citation,
+      type FieldBasis,
+      type JsonSchema,
+      type RunInput,
+      type TaskRunJsonOutput,
+      type TaskRunResult,
+      type TaskRunTextOutput,
+      type TaskSpec,
+      type TextSchema,
+      type TaskRunCreateParams,
+      type TaskRunResultParams,
+    } from './resources/task-run';
+
+    export { Beta } from './resources/beta/beta';
+
+    export type ErrorObject = API.ErrorObject;
+    export type ErrorResponse = API.ErrorResponse;
+    export type SourcePolicy = API.SourcePolicy;
+    export type Warning = API.Warning;
+  }
+}
+
+declare module 'parallel/internal/request-options' {
+  import type { Stream } from '../core/streaming';
+  import type { MergedRequestInit, HTTPMethod } from './types';
+  import type { HeadersLike } from './headers';
+
+  export type FinalRequestOptions = RequestOptions & { method: HTTPMethod; path: string };
+
+  export type RequestOptions = {
+    /**
+     * The HTTP method for the request (e.g., 'get', 'post', 'put', 'delete').
+     */
+    method?: HTTPMethod;
+
+    /**
+     * The URL path for the request.
+     *
+     * @example "/v1/foo"
+     */
+    path?: string;
+
+    /**
+     * Query parameters to include in the request URL.
+     */
+    query?: object | undefined | null;
+
+    /**
+     * The request body. Can be a string, JSON object, FormData, or other supported types.
+     */
+    body?: unknown;
+
+    /**
+     * HTTP headers to include with the request. Can be a Headers object, plain object, or array of tuples.
+     */
+    headers?: HeadersLike;
+
+    /**
+     * The maximum number of times that the client will retry a request in case of a
+     * temporary failure, like a network error or a 5XX error from the server.
+     *
+     * @default 2
+     */
+    maxRetries?: number;
+
+    stream?: boolean | undefined;
+
+    /**
+     * The maximum amount of time (in milliseconds) that the client should wait for a response
+     * from the server before timing out a single request.
+     *
+     * @unit milliseconds
+     */
+    timeout?: number;
+
+    /**
+     * Additional `RequestInit` options to be passed to the underlying `fetch` call.
+     * These options will be merged with the client's default fetch options.
+     */
+    fetchOptions?: MergedRequestInit;
+
+    /**
+     * An AbortSignal that can be used to cancel the request.
+     */
+    signal?: AbortSignal | undefined | null;
+
+    /**
+     * A unique key for this request to enable idempotency.
+     */
+    idempotencyKey?: string;
+
+    /**
+     * Override the default base URL for this specific request.
+     */
+    defaultBaseURL?: string | undefined;
+
+    __binaryResponse?: boolean | undefined;
+    __streamClass?: typeof Stream;
+  };
+}
+
+declare module 'parallel/resources/shared' {
+  /**
+   * An error message.
+   */
+  export interface ErrorObject {
+    /**
+     * Human-readable message.
+     */
+    message: string;
+
+    /**
+     * Reference ID for the error.
+     */
+    ref_id: string;
+
+    /**
+     * Optional detail supporting the error.
+     */
+    detail?: { [key: string]: unknown } | null;
+  }
 
   /**
-   * @deprecated Body param: DEPRECATED: Use `excerpts.max_chars_per_result` instead.
+   * Response object used for non-200 status codes.
    */
-  max_chars_per_result?: number | null;
+  export interface ErrorResponse {
+    /**
+     * Error.
+     */
+    error: ErrorObject;
+
+    /**
+     * Always 'error'.
+     */
+    type: 'error';
+  }
 
   /**
-   * Body param: Upper bound on the number of results to return. May be limited by
-   * the processor. Defaults to 10 if not provided.
-   */
-  max_results?: number | null;
-
-  /**
-   * Body param: Presets default values for parameters for different use cases.
-   * `one-shot` returns more comprehensive results and longer excerpts to answer
-   * questions from a single response, while `agentic` returns more concise,
-   * token-efficient results for use in an agentic loop.
-   */
-  mode?: 'one-shot' | 'agentic' | null;
-
-  /**
-   * Body param: Natural-language description of what the web search is trying to
-   * find. May include guidance about preferred sources or freshness. At least one of
-   * objective or search_queries must be provided.
-   */
-  objective?: string | null;
-
-  /**
-   * @deprecated Body param: DEPRECATED: use `mode` instead.
-   */
-  processor?: 'base' | 'pro' | null;
-
-  /**
-   * Body param: Optional list of traditional keyword search queries to guide the
-   * search. May contain search operators. At least one of objective or
-   * search_queries must be provided.
-   */
-  search_queries?: Array<string> | null;
-
-  /**
-   * Body param: Source policy for web search results.
+   * Source policy for web search results.
    *
    * This policy governs which sources are allowed/disallowed in results.
    */
-  source_policy?: SourcePolicy | null;
+  export interface SourcePolicy {
+    /**
+     * Optional start date for filtering search results. Results will be limited to
+     * content published on or after this date. Provided as an RFC 3339 date string
+     * (YYYY-MM-DD).
+     */
+    after_date?: string | null;
+
+    /**
+     * List of domains to exclude from results. If specified, sources from these
+     * domains will be excluded. Accepts plain domains (e.g., example.com,
+     * subdomain.example.gov) or bare domain extension starting with a period (e.g.,
+     * .gov, .edu, .co.uk).
+     */
+    exclude_domains?: Array<string>;
+
+    /**
+     * List of domains to restrict the results to. If specified, only sources from
+     * these domains will be included. Accepts plain domains (e.g., example.com,
+     * subdomain.example.gov) or bare domain extension starting with a period (e.g.,
+     * .gov, .edu, .co.uk).
+     */
+    include_domains?: Array<string>;
+  }
 
   /**
-   * Header param: Optional header to specify the beta version(s) to enable.
+   * Human-readable message for a task.
    */
-  betas?: Array<Beta.ParallelBeta>;
+  export interface Warning {
+    /**
+     * Human-readable message.
+     */
+    message: string;
+
+    /**
+     * Type of warning. Note that adding new warning types is considered a
+     * backward-compatible change.
+     */
+    type: 'spec_validation_warning' | 'input_validation_warning' | 'warning';
+
+    /**
+     * Optional detail supporting the warning.
+     */
+    detail?: { [key: string]: unknown } | null;
+  }
 }
 
-/* ===== Beta.TaskRun ===== */
-
-export declare namespace Beta {
-  export type ParallelBeta =
-    | 'mcp-server-2025-07-17'
-    | 'events-sse-2025-07-24'
-    | 'webhook-2025-08-12'
-    | 'findall-2025-09-15'
-    | 'search-extract-2025-10-10'
-    | 'field-basis-2025-11-25'
-    | (string & {});
+declare module 'parallel/resources/task-run' {
+  import { APIResource } from '../core/resource';
+  import { APIPromise } from '../core/api-promise';
+  import type * as Shared from './shared';
+  import type { RequestOptions } from '../internal/request-options';
 
   export class TaskRun extends APIResource {
     /**
@@ -1045,7 +511,786 @@ export declare namespace Beta {
      *
      * Beta features can be enabled by setting the 'parallel-beta' header.
      */
-    create(params: TaskRunCreateParams, options?: Parallel.RequestOptions): APIPromise<TaskRunObject>;
+    create(body: TaskRunCreateParams, options?: RequestOptions): APIPromise<TaskRun>;
+
+    /**
+     * Retrieves run status by run_id.
+     *
+     * The run result is available from the `/result` endpoint.
+     */
+    retrieve(runID: string, options?: RequestOptions): APIPromise<TaskRun>;
+
+    /**
+     * Retrieves a run result by run_id, blocking until the run is completed.
+     */
+    result(runID: string, query?: TaskRunResultParams | null | undefined, options?: RequestOptions): APIPromise<TaskRunResult>;
+  }
+
+  /**
+   * Auto schema for a task input or output.
+   */
+  export interface AutoSchema {
+    /**
+     * The type of schema being defined. Always `auto`.
+     */
+    type?: 'auto';
+  }
+
+  /**
+   * A citation for a task output.
+   */
+  export interface Citation {
+    /**
+     * URL of the citation.
+     */
+    url: string;
+
+    /**
+     * Excerpts from the citation supporting the output. Only certain processors
+     * provide excerpts.
+     */
+    excerpts?: Array<string> | null;
+
+    /**
+     * Title of the citation.
+     */
+    title?: string | null;
+  }
+
+  /**
+   * Citations and reasoning supporting one field of a task output.
+   */
+  export interface FieldBasis {
+    /**
+     * Name of the output field.
+     */
+    field: string;
+
+    /**
+     * Reasoning for the output field.
+     */
+    reasoning: string;
+
+    /**
+     * List of citations supporting the output field.
+     */
+    citations?: Array<Citation>;
+
+    /**
+     * Confidence level for the output field. Only certain processors provide
+     * confidence levels.
+     */
+    confidence?: string | null;
+  }
+
+  /**
+   * JSON schema for a task input or output.
+   */
+  export interface JsonSchema {
+    /**
+     * A JSON Schema object. Only a subset of JSON Schema is supported.
+     */
+    json_schema: { [key: string]: unknown };
+
+    /**
+     * The type of schema being defined. Always `json`.
+     */
+    type?: 'json';
+  }
+
+  /**
+   * Request to run a task.
+   */
+  export interface RunInput {
+    /**
+     * Input to the task, either text or a JSON object.
+     */
+    input: string | { [key: string]: unknown };
+
+    /**
+     * Processor to use for the task.
+     */
+    processor: string;
+
+    /**
+     * User-provided metadata stored with the run. Keys and values must be strings with
+     * a maximum length of 16 and 512 characters respectively.
+     */
+    metadata?: { [key: string]: string | number | boolean } | null;
+
+    /**
+     * Source policy for web search results.
+     *
+     * This policy governs which sources are allowed/disallowed in results.
+     */
+    source_policy?: Shared.SourcePolicy | null;
+
+    /**
+     * Specification for a task.
+     *
+     * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
+     * Not specifying a TaskSpec is the same as setting an auto output schema.
+     *
+     * For convenience bare strings are also accepted as input or output schemas.
+     */
+    task_spec?: TaskSpec | null;
+  }
+
+  /**
+   * Status of a task run.
+   */
+  export interface TaskRun {
+    /**
+     * Timestamp of the creation of the task, as an RFC 3339 string.
+     */
+    created_at: string | null;
+
+    /**
+     * Whether the run is currently active, i.e. status is one of {'cancelling',
+     * 'queued', 'running'}.
+     */
+    is_active: boolean;
+
+    /**
+     * Timestamp of the last modification to the task, as an RFC 3339 string.
+     */
+    modified_at: string | null;
+
+    /**
+     * Processor used for the run.
+     */
+    processor: string;
+
+    /**
+     * ID of the task run.
+     */
+    run_id: string;
+
+    /**
+     * Status of the run.
+     */
+    status: 'queued' | 'action_required' | 'running' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
+
+    /**
+     * An error message.
+     */
+    error?: Shared.ErrorObject | null;
+
+    /**
+     * User-provided metadata stored with the run.
+     */
+    metadata?: { [key: string]: string | number | boolean } | null;
+
+    /**
+     * ID of the taskgroup to which the run belongs.
+     */
+    taskgroup_id?: string | null;
+
+    /**
+     * Warnings for the run, if any.
+     */
+    warnings?: Array<Shared.Warning> | null;
+  }
+
+  /**
+   * Output from a task that returns JSON.
+   */
+  export interface TaskRunJsonOutput {
+    /**
+     * Basis for each top-level field in the JSON output. Per-list-element basis
+     * entries are available only when the `parallel-beta: field-basis-2025-11-25`
+     * header is supplied.
+     */
+    basis: Array<FieldBasis>;
+
+    /**
+     * Output from the task as a native JSON object, as determined by the output schema
+     * of the task spec.
+     */
+    content: { [key: string]: unknown };
+
+    /**
+     * The type of output being returned, as determined by the output schema of the
+     * task spec.
+     */
+    type: 'json';
+
+    /**
+     * Additional fields from beta features used in this task run. When beta features
+     * are specified during both task run creation and result retrieval, this field
+     * will be empty and instead the relevant beta attributes will be directly included
+     * in the `BetaTaskRunJsonOutput` or corresponding output type. However, if beta
+     * features were specified during task run creation but not during result
+     * retrieval, this field will contain the dump of fields from those beta features.
+     * Each key represents the beta feature version (one amongst parallel-beta headers)
+     * and the values correspond to the beta feature attributes, if any. For now, only
+     * MCP server beta features have attributes. For example,
+     * `{mcp-server-2025-07-17: [{'server_name':'mcp_server', 'tool_call_id': 'tc_123', ...}]}}`
+     */
+    beta_fields?: { [key: string]: unknown } | null;
+
+    /**
+     * Output schema for the Task Run. Populated only if the task was executed with an
+     * auto schema.
+     */
+    output_schema?: { [key: string]: unknown } | null;
+  }
+
+  /**
+   * Result of a task run.
+   */
+  export interface TaskRunResult {
+    /**
+     * Output from the task conforming to the output schema.
+     */
+    output: TaskRunTextOutput | TaskRunJsonOutput;
+
+    /**
+     * Task run object with status 'completed'.
+     */
+    run: TaskRun;
+  }
+
+  /**
+   * Output from a task that returns text.
+   */
+  export interface TaskRunTextOutput {
+    /**
+     * Basis for the output. The basis has a single field 'output'.
+     */
+    basis: Array<FieldBasis>;
+
+    /**
+     * Text output from the task.
+     */
+    content: string;
+
+    /**
+     * The type of output being returned, as determined by the output schema of the
+     * task spec.
+     */
+    type: 'text';
+
+    /**
+     * Additional fields from beta features used in this task run. When beta features
+     * are specified during both task run creation and result retrieval, this field
+     * will be empty and instead the relevant beta attributes will be directly included
+     * in the `BetaTaskRunJsonOutput` or corresponding output type. However, if beta
+     * features were specified during task run creation but not during result
+     * retrieval, this field will contain the dump of fields from those beta features.
+     * Each key represents the beta feature version (one amongst parallel-beta headers)
+     * and the values correspond to the beta feature attributes, if any. For now, only
+     * MCP server beta features have attributes. For example,
+     * `{mcp-server-2025-07-17: [{'server_name':'mcp_server', 'tool_call_id': 'tc_123', ...}]}}`
+     */
+    beta_fields?: { [key: string]: unknown } | null;
+  }
+
+  /**
+   * Specification for a task.
+   *
+   * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
+   * Not specifying a TaskSpec is the same as setting an auto output schema.
+   *
+   * For convenience bare strings are also accepted as input or output schemas.
+   */
+  export interface TaskSpec {
+    /**
+     * JSON schema or text fully describing the desired output from the task.
+     * Descriptions of output fields will determine the form and content of the
+     * response. A bare string is equivalent to a text schema with the same
+     * description.
+     */
+    output_schema: JsonSchema | TextSchema | AutoSchema | string;
+
+    /**
+     * Optional JSON schema or text description of expected input to the task. A bare
+     * string is equivalent to a text schema with the same description.
+     */
+    input_schema?: string | JsonSchema | TextSchema | null;
+  }
+
+  /**
+   * Text description for a task input or output.
+   */
+  export interface TextSchema {
+    /**
+     * A text description of the desired output from the task.
+     */
+    description?: string | null;
+
+    /**
+     * The type of schema being defined. Always `text`.
+     */
+    type?: 'text';
+  }
+
+  export interface TaskRunCreateParams {
+    /**
+     * Input to the task, either text or a JSON object.
+     */
+    input: string | { [key: string]: unknown };
+
+    /**
+     * Processor to use for the task.
+     */
+    processor: string;
+
+    /**
+     * User-provided metadata stored with the run. Keys and values must be strings with
+     * a maximum length of 16 and 512 characters respectively.
+     */
+    metadata?: { [key: string]: string | number | boolean } | null;
+
+    /**
+     * Source policy for web search results.
+     *
+     * This policy governs which sources are allowed/disallowed in results.
+     */
+    source_policy?: Shared.SourcePolicy | null;
+
+    /**
+     * Specification for a task.
+     *
+     * Auto output schemas can be specified by setting `output_schema={"type":"auto"}`.
+     * Not specifying a TaskSpec is the same as setting an auto output schema.
+     *
+     * For convenience bare strings are also accepted as input or output schemas.
+     */
+    task_spec?: TaskSpec | null;
+  }
+
+  export interface TaskRunResultParams {
+    timeout?: number;
+  }
+}
+
+declare module 'parallel/resources/beta/beta' {
+  import { APIResource } from '../../core/resource';
+  import { APIPromise } from '../../core/api-promise';
+  import type { RequestOptions } from '../../internal/request-options';
+
+  import * as Shared from '../shared';
+  import { TaskRun as BetaTaskRunResource } from './task-run';
+  import { TaskGroup as TaskGroupResource } from './task-group';
+  import { FindAll as FindAllResource } from './findall';
+
+  export class Beta extends APIResource {
+    taskRun: BetaTaskRunResource;
+    taskGroup: TaskGroupResource;
+    findall: FindAllResource;
+
+    /**
+     * Extracts relevant content from specific web URLs.
+     *
+     * To access this endpoint, pass the `parallel-beta` header with the value
+     * `search-extract-2025-10-10`.
+     */
+    extract(params: BetaExtractParams, options?: RequestOptions): APIPromise<ExtractResponse>;
+
+    /**
+     * Searches the web.
+     *
+     * To access this endpoint, pass the `parallel-beta` header with the value
+     * `search-extract-2025-10-10`.
+     */
+    search(params: BetaSearchParams, options?: RequestOptions): APIPromise<SearchResult>;
+  }
+
+  /**
+   * Optional settings for returning relevant excerpts.
+   */
+  export interface ExcerptSettings {
+    /**
+     * Optional upper bound on the total number of characters to include per url.
+     * Excerpts may contain fewer characters than this limit to maximize relevance and
+     * token efficiency, but will never contain fewer than 1000 characters per result.
+     */
+    max_chars_per_result?: number | null;
+
+    /**
+     * Optional upper bound on the total number of characters to include across all
+     * urls. Results may contain fewer characters than this limit to maximize relevance
+     * and token efficiency, but will never contain fewer than 1000 characters per
+     * result.This overall limit applies in addition to max_chars_per_result.
+     */
+    max_chars_total?: number | null;
+  }
+
+  /**
+   * Extract error details.
+   */
+  export interface ExtractError {
+    /**
+     * Content returned for http client or server errors, if any.
+     */
+    content: string | null;
+
+    /**
+     * Error type.
+     */
+    error_type: string;
+
+    /**
+     * HTTP status code, if available.
+     */
+    http_status_code: number | null;
+
+    url: string;
+  }
+
+  /**
+   * Fetch result.
+   */
+  export interface ExtractResponse {
+    /**
+     * Extract errors: requested URLs not in the results.
+     */
+    errors: Array<ExtractError>;
+
+    /**
+     * Extract request ID, e.g. `extract_cad0a6d2dec046bd95ae900527d880e7`
+     */
+    extract_id: string;
+
+    /**
+     * Successful extract results.
+     */
+    results: Array<ExtractResult>;
+
+    /**
+     * Usage metrics for the extract request.
+     */
+    usage?: Array<UsageItem> | null;
+
+    /**
+     * Warnings for the extract request, if any.
+     */
+    warnings?: Array<Shared.Warning> | null;
+  }
+
+  /**
+   * Extract result for a single URL.
+   */
+  export interface ExtractResult {
+    /**
+     * URL associated with the search result.
+     */
+    url: string;
+
+    /**
+     * Relevant excerpted content from the URL, formatted as markdown.
+     */
+    excerpts?: Array<string> | null;
+
+    /**
+     * Full content from the URL formatted as markdown, if requested.
+     */
+    full_content?: string | null;
+
+    /**
+     * Publish date of the webpage in YYYY-MM-DD format, if available.
+     */
+    publish_date?: string | null;
+
+    /**
+     * Title of the webpage, if available.
+     */
+    title?: string | null;
+  }
+
+  /**
+   * Policy for live fetching web results.
+   */
+  export interface FetchPolicy {
+    /**
+     * If false, fallback to cached content older than max-age if live fetch fails or
+     * times out. If true, returns an error instead.
+     */
+    disable_cache_fallback?: boolean;
+
+    /**
+     * Maximum age of cached content in seconds to trigger a live fetch. Minimum value
+     * 600 seconds (10 minutes).
+     */
+    max_age_seconds?: number | null;
+
+    /**
+     * Timeout in seconds for fetching live content if unavailable in cache.
+     */
+    timeout_seconds?: number | null;
+  }
+
+  /**
+   * Output for the Search API.
+   */
+  export interface SearchResult {
+    /**
+     * A list of WebSearchResult objects, ordered by decreasing relevance.
+     */
+    results: Array<WebSearchResult>;
+
+    /**
+     * Search ID. Example: `search_cad0a6d2dec046bd95ae900527d880e7`
+     */
+    search_id: string;
+
+    /**
+     * Usage metrics for the search request.
+     */
+    usage?: Array<UsageItem> | null;
+
+    /**
+     * Warnings for the search request, if any.
+     */
+    warnings?: Array<Shared.Warning> | null;
+  }
+
+  /**
+   * Usage item for a single operation.
+   */
+  export interface UsageItem {
+    /**
+     * Count of the SKU.
+     */
+    count: number;
+
+    /**
+     * Name of the SKU.
+     */
+    name: string;
+  }
+
+  /**
+   * A single search result from the web search API.
+   */
+  export interface WebSearchResult {
+    /**
+     * URL associated with the search result.
+     */
+    url: string;
+
+    /**
+     * Relevant excerpted content from the URL, formatted as markdown.
+     */
+    excerpts?: Array<string> | null;
+
+    /**
+     * Publish date of the webpage in YYYY-MM-DD format, if available.
+     */
+    publish_date?: string | null;
+
+    /**
+     * Title of the webpage, if available.
+     */
+    title?: string | null;
+  }
+
+  export interface BetaExtractParams {
+    /**
+     * Body param
+     */
+    urls: Array<string>;
+
+    /**
+     * Body param: Include excerpts from each URL relevant to the search objective and
+     * queries. Note that if neither objective nor search_queries is provided, excerpts
+     * are redundant with full content.
+     */
+    excerpts?: boolean | ExcerptSettings;
+
+    /**
+     * Body param: Policy for live fetching web results.
+     */
+    fetch_policy?: FetchPolicy | null;
+
+    /**
+     * Body param: Include full content from each URL. Note that if neither objective
+     * nor search_queries is provided, excerpts are redundant with full content.
+     */
+    full_content?: boolean | BetaExtractParams.FullContentSettings;
+
+    /**
+     * Body param: If provided, focuses extracted content on the specified search
+     * objective.
+     */
+    objective?: string | null;
+
+    /**
+     * Body param: If provided, focuses extracted content on the specified keyword
+     * search queries.
+     */
+    search_queries?: Array<string> | null;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<import('./task-run').ParallelBeta>;
+  }
+
+  export namespace BetaExtractParams {
+    /**
+     * Optional settings for returning full content.
+     */
+    export interface FullContentSettings {
+      /**
+       * Optional limit on the number of characters to include in the full content for
+       * each url. Full content always starts at the beginning of the page and is
+       * truncated at the limit if necessary.
+       */
+      max_chars_per_result?: number | null;
+    }
+  }
+
+  export interface BetaSearchParams {
+    /**
+     * Body param: Optional settings to configure excerpt generation.
+     */
+    excerpts?: ExcerptSettings;
+
+    /**
+     * Body param: Policy for live fetching web results.
+     */
+    fetch_policy?: FetchPolicy | null;
+
+    /**
+     * @deprecated Body param: DEPRECATED: Use `excerpts.max_chars_per_result` instead.
+     */
+    max_chars_per_result?: number | null;
+
+    /**
+     * Body param: Upper bound on the number of results to return. May be limited by
+     * the processor. Defaults to 10 if not provided.
+     */
+    max_results?: number | null;
+
+    /**
+     * Body param: Presets default values for parameters for different use cases.
+     * `one-shot` returns more comprehensive results and longer excerpts to answer
+     * questions from a single response, while `agentic` returns more concise,
+     * token-efficient results for use in an agentic loop.
+     */
+    mode?: 'one-shot' | 'agentic' | null;
+
+    /**
+     * Body param: Natural-language description of what the web search is trying to
+     * find. May include guidance about preferred sources or freshness. At least one of
+     * objective or search_queries must be provided.
+     */
+    objective?: string | null;
+
+    /**
+     * @deprecated Body param: DEPRECATED: use `mode` instead.
+     */
+    processor?: 'base' | 'pro' | null;
+
+    /**
+     * Body param: Optional list of traditional keyword search queries to guide the
+     * search. May contain search operators. At least one of objective or
+     * search_queries must be provided.
+     */
+    search_queries?: Array<string> | null;
+
+    /**
+     * Body param: Source policy for web search results.
+     *
+     * This policy governs which sources are allowed/disallowed in results.
+     */
+    source_policy?: Shared.SourcePolicy | null;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<import('./task-run').ParallelBeta>;
+  }
+
+  // Namespace re-exports (for parity with source)
+  export declare namespace Beta {
+    export {
+      type ExcerptSettings,
+      type ExtractError,
+      type ExtractResponse,
+      type ExtractResult,
+      type FetchPolicy,
+      type SearchResult,
+      type UsageItem,
+      type WebSearchResult,
+      type BetaExtractParams,
+      type BetaSearchParams,
+    };
+
+    export {
+      TaskRun,
+      type BetaRunInput,
+      type BetaTaskRunResult,
+      type ErrorEvent,
+      type McpServer,
+      type McpToolCall,
+      type ParallelBeta,
+      type TaskRunEvent,
+      type Webhook,
+      type TaskRunEventsResponse,
+      type TaskRunCreateParams,
+      type TaskRunResultParams,
+    } from './task-run';
+
+    export {
+      type TaskGroup,
+      type TaskGroupRunResponse,
+      type TaskGroupStatus,
+      type TaskGroupEventsResponse,
+      type TaskGroupGetRunsResponse,
+      type TaskGroupCreateParams,
+      type TaskGroupAddRunsParams,
+      type TaskGroupEventsParams,
+      type TaskGroupGetRunsParams,
+    } from './task-group';
+
+    export {
+      FindAll,
+      type FindAllCandidateMatchStatusEvent,
+      type FindAllEnrichInput,
+      type FindAllExtendInput,
+      type FindAllRun,
+      type FindAllRunInput,
+      type FindAllRunResult,
+      type FindAllRunStatusEvent,
+      type FindAllSchema,
+      type FindAllSchemaUpdatedEvent,
+      type IngestInput,
+      type FindAllCancelResponse,
+      type FindAllEventsResponse,
+      type FindAllCreateParams,
+      type FindAllRetrieveParams,
+      type FindAllCancelParams,
+      type FindAllEnrichParams,
+      type FindAllEventsParams,
+      type FindAllExtendParams,
+      type FindAllIngestParams,
+      type FindAllResultParams,
+      type FindAllSchemaParams,
+    } from './findall';
+  }
+}
+
+declare module 'parallel/resources/beta/task-run' {
+  import { APIResource } from '../../core/resource';
+  import { APIPromise } from '../../core/api-promise';
+  import { Stream } from '../../core/streaming';
+  import type { RequestOptions } from '../../internal/request-options';
+
+  import type * as Shared from '../shared';
+  import type * as TaskRunAPI from '../task-run';
+
+  export class TaskRun extends APIResource {
+    /**
+     * Initiates a task run.
+     *
+     * Returns immediately with a run object in status 'queued'.
+     *
+     * Beta features can be enabled by setting the 'parallel-beta' header.
+     */
+    create(params: TaskRunCreateParams, options?: RequestOptions): APIPromise<TaskRunAPI.TaskRun>;
 
     /**
      * Streams events for a task run.
@@ -1056,7 +1301,7 @@ export declare namespace Beta {
      * For task runs that did not have enable_events set to true during creation, the
      * frequency of events will be reduced.
      */
-    events(runID: string, options?: Parallel.RequestOptions): APIPromise<Stream<TaskRunEventsResponse>>;
+    events(runID: string, options?: RequestOptions): APIPromise<Stream<TaskRunEventsResponse>>;
 
     /**
      * Retrieves a run result by run_id, blocking until the run is completed.
@@ -1064,7 +1309,7 @@ export declare namespace Beta {
     result(
       runID: string,
       params?: TaskRunResultParams | null | undefined,
-      options?: Parallel.RequestOptions,
+      options?: RequestOptions,
     ): APIPromise<BetaTaskRunResult>;
   }
 
@@ -1112,7 +1357,7 @@ export declare namespace Beta {
      *
      * This policy governs which sources are allowed/disallowed in results.
      */
-    source_policy?: SourcePolicy | null;
+    source_policy?: Shared.SourcePolicy | null;
 
     /**
      * Specification for a task.
@@ -1122,7 +1367,7 @@ export declare namespace Beta {
      *
      * For convenience bare strings are also accepted as input or output schemas.
      */
-    task_spec?: TaskSpec | null;
+    task_spec?: TaskRunAPI.TaskSpec | null;
 
     /**
      * Webhooks for Task Runs.
@@ -1142,7 +1387,7 @@ export declare namespace Beta {
     /**
      * Beta task run object with status 'completed'.
      */
-    run: TaskRunObject;
+    run: TaskRunAPI.TaskRun;
   }
 
   export namespace BetaTaskRunResult {
@@ -1155,7 +1400,7 @@ export declare namespace Beta {
        * `parallel-beta` header with the value `field-basis-2025-11-25` when creating the
        * run.
        */
-      basis: Array<FieldBasis>;
+      basis: Array<TaskRunAPI.FieldBasis>;
 
       /**
        * Text output from the task.
@@ -1188,7 +1433,7 @@ export declare namespace Beta {
        * `parallel-beta` header with the value `field-basis-2025-11-25` when creating the
        * run.
        */
-      basis: Array<FieldBasis>;
+      basis: Array<TaskRunAPI.FieldBasis>;
 
       /**
        * Output from the task as a native JSON object, as determined by the output schema
@@ -1227,7 +1472,7 @@ export declare namespace Beta {
     /**
      * Error.
      */
-    error: ErrorObject;
+    error: Shared.ErrorObject;
 
     /**
      * Event type; always 'error'.
@@ -1301,6 +1546,18 @@ export declare namespace Beta {
   }
 
   /**
+   * Model for the parallel-beta header.
+   */
+  export type ParallelBeta =
+    | 'mcp-server-2025-07-17'
+    | 'events-sse-2025-07-24'
+    | 'webhook-2025-08-12'
+    | 'findall-2025-09-15'
+    | 'search-extract-2025-10-10'
+    | 'field-basis-2025-11-25'
+    | (string & {});
+
+  /**
    * Event when a task run transitions to a non-active status.
    *
    * May indicate completion, cancellation, or failure.
@@ -1314,7 +1571,7 @@ export declare namespace Beta {
     /**
      * Task run object.
      */
-    run: TaskRunObject;
+    run: TaskRunAPI.TaskRun;
 
     /**
      * Event type; always 'task_run.state'.
@@ -1329,7 +1586,7 @@ export declare namespace Beta {
     /**
      * Output from the run; included only if requested and if status == `completed`.
      */
-    output?: TaskRunTextOutput | TaskRunJsonOutput | null;
+    output?: TaskRunAPI.TaskRunTextOutput | TaskRunAPI.TaskRunJsonOutput | null;
   }
 
   /**
@@ -1467,7 +1724,7 @@ export declare namespace Beta {
      *
      * This policy governs which sources are allowed/disallowed in results.
      */
-    source_policy?: SourcePolicy | null;
+    source_policy?: Shared.SourcePolicy | null;
 
     /**
      * Body param: Specification for a task.
@@ -1477,7 +1734,7 @@ export declare namespace Beta {
      *
      * For convenience bare strings are also accepted as input or output schemas.
      */
-    task_spec?: TaskSpec | null;
+    task_spec?: TaskRunAPI.TaskSpec | null;
 
     /**
      * Body param: Webhooks for Task Runs.
@@ -1501,19 +1758,27 @@ export declare namespace Beta {
      */
     betas?: Array<ParallelBeta>;
   }
+}
 
-  /* ===== Beta.TaskGroup ===== */
+declare module 'parallel/resources/beta/task-group' {
+  import { APIResource } from '../../core/resource';
+  import { APIPromise } from '../../core/api-promise';
+  import { Stream } from '../../core/streaming';
+  import type { RequestOptions } from '../../internal/request-options';
+
+  import type * as TaskRunAPI from '../task-run';
+  import type * as BetaTaskRunAPI from './task-run';
 
   export class TaskGroup extends APIResource {
     /**
      * Initiates a TaskGroup to group and track multiple runs.
      */
-    create(body: TaskGroupCreateParams, options?: Parallel.RequestOptions): APIPromise<TaskGroupObject>;
+    create(body: TaskGroupCreateParams, options?: RequestOptions): APIPromise<TaskGroup>;
 
     /**
      * Retrieves aggregated status across runs in a TaskGroup.
      */
-    retrieve(taskGroupID: string, options?: Parallel.RequestOptions): APIPromise<TaskGroupObject>;
+    retrieve(taskGroupID: string, options?: RequestOptions): APIPromise<TaskGroup>;
 
     /**
      * Initiates multiple task runs within a TaskGroup.
@@ -1521,7 +1786,7 @@ export declare namespace Beta {
     addRuns(
       taskGroupID: string,
       params: TaskGroupAddRunsParams,
-      options?: Parallel.RequestOptions,
+      options?: RequestOptions,
     ): APIPromise<TaskGroupRunResponse>;
 
     /**
@@ -1533,7 +1798,7 @@ export declare namespace Beta {
     events(
       taskGroupID: string,
       query?: TaskGroupEventsParams | undefined,
-      options?: Parallel.RequestOptions,
+      options?: RequestOptions,
     ): APIPromise<Stream<TaskGroupEventsResponse>>;
 
     /**
@@ -1551,14 +1816,14 @@ export declare namespace Beta {
     getRuns(
       taskGroupID: string,
       query?: TaskGroupGetRunsParams | undefined,
-      options?: Parallel.RequestOptions,
+      options?: RequestOptions,
     ): APIPromise<Stream<TaskGroupGetRunsResponse>>;
   }
 
   /**
    * Response object for a task group, including its status and metadata.
    */
-  export interface TaskGroupObject {
+  export interface TaskGroup {
     /**
      * Timestamp of the creation of the group, as an RFC 3339 string.
      */
@@ -1645,8 +1910,8 @@ export declare namespace Beta {
    */
   export type TaskGroupEventsResponse =
     | TaskGroupEventsResponse.TaskGroupStatusEvent
-    | TaskRunEvent
-    | ErrorEvent;
+    | BetaTaskRunAPI.TaskRunEvent
+    | BetaTaskRunAPI.ErrorEvent;
 
   export namespace TaskGroupEventsResponse {
     /**
@@ -1675,7 +1940,7 @@ export declare namespace Beta {
    *
    * May indicate completion, cancellation, or failure.
    */
-  export type TaskGroupGetRunsResponse = TaskRunEvent | ErrorEvent;
+  export type TaskGroupGetRunsResponse = BetaTaskRunAPI.TaskRunEvent | BetaTaskRunAPI.ErrorEvent;
 
   export interface TaskGroupCreateParams {
     /**
@@ -1688,7 +1953,7 @@ export declare namespace Beta {
     /**
      * Body param: List of task runs to execute.
      */
-    inputs: Array<BetaRunInput>;
+    inputs: Array<BetaTaskRunAPI.BetaRunInput>;
 
     /**
      * Body param: Specification for a task.
@@ -1698,12 +1963,12 @@ export declare namespace Beta {
      *
      * For convenience bare strings are also accepted as input or output schemas.
      */
-    default_task_spec?: TaskSpec | null;
+    default_task_spec?: TaskRunAPI.TaskSpec | null;
 
     /**
      * Header param: Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
+    betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
   export interface TaskGroupEventsParams {
@@ -1725,8 +1990,16 @@ export declare namespace Beta {
       | 'cancelled'
       | null;
   }
+}
 
-  /* ===== Beta.FindAll ===== */
+declare module 'parallel/resources/beta/findall' {
+  import { APIResource } from '../../core/resource';
+  import { APIPromise } from '../../core/api-promise';
+  import { Stream } from '../../core/streaming';
+  import type { RequestOptions } from '../../internal/request-options';
+
+  import type * as TaskRunAPI from '../task-run';
+  import type * as BetaTaskRunAPI from './task-run';
 
   export class FindAll extends APIResource {
     /**
@@ -1743,34 +2016,22 @@ export declare namespace Beta {
      * - Or specifying a webhook with relevant event types during run creation to
      *   receive notifications.
      */
-    create(params: FindAllCreateParams, options?: Parallel.RequestOptions): APIPromise<FindAllRun>;
+    create(params: FindAllCreateParams, options?: RequestOptions): APIPromise<FindAllRun>;
 
     /**
      * Retrieve a FindAll run.
      */
-    retrieve(
-      findallID: string,
-      params?: FindAllRetrieveParams | null | undefined,
-      options?: Parallel.RequestOptions,
-    ): APIPromise<FindAllRun>;
+    retrieve(findallID: string, params?: FindAllRetrieveParams | null | undefined, options?: RequestOptions): APIPromise<FindAllRun>;
 
     /**
      * Cancel a FindAll run.
      */
-    cancel(
-      findallID: string,
-      params?: FindAllCancelParams | null | undefined,
-      options?: Parallel.RequestOptions,
-    ): APIPromise<unknown>;
+    cancel(findallID: string, params?: FindAllCancelParams | null | undefined, options?: RequestOptions): APIPromise<unknown>;
 
     /**
      * Add an enrichment to a FindAll run.
      */
-    enrich(
-      findallID: string,
-      params: FindAllEnrichParams,
-      options?: Parallel.RequestOptions,
-    ): APIPromise<FindAllSchema>;
+    enrich(findallID: string, params: FindAllEnrichParams, options?: RequestOptions): APIPromise<FindAllSchema>;
 
     /**
      * Stream events from a FindAll run.
@@ -1783,17 +2044,13 @@ export declare namespace Beta {
     events(
       findallID: string,
       params?: FindAllEventsParams | undefined,
-      options?: Parallel.RequestOptions,
+      options?: RequestOptions,
     ): APIPromise<Stream<FindAllEventsResponse>>;
 
     /**
      * Extend a FindAll run by adding additional matches to the current match limit.
      */
-    extend(
-      findallID: string,
-      params: FindAllExtendParams,
-      options?: Parallel.RequestOptions,
-    ): APIPromise<FindAllSchema>;
+    extend(findallID: string, params: FindAllExtendParams, options?: RequestOptions): APIPromise<FindAllSchema>;
 
     /**
      * Transforms a natural language search objective into a structured FindAll spec.
@@ -1803,25 +2060,17 @@ export declare namespace Beta {
      * The generated specification serves as a suggested starting point and can be
      * further customized by the user.
      */
-    ingest(params: FindAllIngestParams, options?: Parallel.RequestOptions): APIPromise<FindAllSchema>;
+    ingest(params: FindAllIngestParams, options?: RequestOptions): APIPromise<FindAllSchema>;
 
     /**
      * Retrieve the FindAll run result at the time of the request.
      */
-    result(
-      findallID: string,
-      params?: FindAllResultParams | null | undefined,
-      options?: Parallel.RequestOptions,
-    ): APIPromise<FindAllRunResult>;
+    result(findallID: string, params?: FindAllResultParams | null | undefined, options?: RequestOptions): APIPromise<FindAllRunResult>;
 
     /**
      * Get FindAll Run Schema
      */
-    schema(
-      findallID: string,
-      params?: FindAllSchemaParams | null | undefined,
-      options?: Parallel.RequestOptions,
-    ): APIPromise<FindAllSchema>;
+    schema(findallID: string, params?: FindAllSchemaParams | null | undefined, options?: RequestOptions): APIPromise<FindAllSchema>;
   }
 
   /**
@@ -1876,15 +2125,12 @@ export declare namespace Beta {
        */
       name: string;
 
-      /**
-       * URL that provides context or details of the entity for disambiguation.
-       */
       url: string;
 
       /**
        * List of FieldBasis objects supporting the output.
        */
-      basis?: Array<FieldBasis> | null;
+      basis?: Array<TaskRunAPI.FieldBasis> | null;
 
       /**
        * Brief description of the entity that can help answer whether entity satisfies
@@ -1908,12 +2154,12 @@ export declare namespace Beta {
     /**
      * JSON schema for the enrichment output schema for the FindAll run.
      */
-    output_schema: JsonSchema;
+    output_schema: TaskRunAPI.JsonSchema;
 
     /**
      * List of MCP servers to use for the task.
      */
-    mcp_servers?: Array<McpServer> | null;
+    mcp_servers?: Array<BetaTaskRunAPI.McpServer> | null;
 
     /**
      * Processor to use for the task.
@@ -2063,7 +2309,7 @@ export declare namespace Beta {
     /**
      * Webhooks for Task Runs.
      */
-    webhook?: Webhook | null;
+    webhook?: BetaTaskRunAPI.Webhook | null;
   }
 
   export namespace FindAllRunInput {
@@ -2148,15 +2394,12 @@ export declare namespace Beta {
        */
       name: string;
 
-      /**
-       * URL that provides context or details of the entity for disambiguation.
-       */
       url: string;
 
       /**
        * List of FieldBasis objects supporting the output.
        */
-      basis?: Array<FieldBasis> | null;
+      basis?: Array<TaskRunAPI.FieldBasis> | null;
 
       /**
        * Brief description of the entity that can help answer whether entity satisfies
@@ -2296,7 +2539,7 @@ export declare namespace Beta {
     | FindAllSchemaUpdatedEvent
     | FindAllRunStatusEvent
     | FindAllCandidateMatchStatusEvent
-    | ErrorEvent;
+    | BetaTaskRunAPI.ErrorEvent;
 
   export interface FindAllCreateParams {
     /**
@@ -2338,12 +2581,12 @@ export declare namespace Beta {
     /**
      * Body param: Webhooks for Task Runs.
      */
-    webhook?: Webhook | null;
+    webhook?: BetaTaskRunAPI.Webhook | null;
 
     /**
      * Header param: Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
+    betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
   export namespace FindAllCreateParams {
@@ -2384,26 +2627,26 @@ export declare namespace Beta {
     /**
      * Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
+    betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
   export interface FindAllCancelParams {
     /**
      * Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
+    betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
   export interface FindAllEnrichParams {
     /**
      * Body param: JSON schema for the enrichment output schema for the FindAll run.
      */
-    output_schema: JsonSchema;
+    output_schema: TaskRunAPI.JsonSchema;
 
     /**
      * Body param: List of MCP servers to use for the task.
      */
-    mcp_servers?: Array<McpServer> | null;
+    mcp_servers?: Array<BetaTaskRunAPI.McpServer> | null;
 
     /**
      * Body param: Processor to use for the task.
@@ -2413,7 +2656,7 @@ export declare namespace Beta {
     /**
      * Header param: Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
+    betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
   export interface FindAllEventsParams {
@@ -2430,7 +2673,7 @@ export declare namespace Beta {
     /**
      * Header param: Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
+    betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
   export interface FindAllExtendParams {
@@ -2444,7 +2687,7 @@ export declare namespace Beta {
     /**
      * Header param: Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
+    betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
   export interface FindAllIngestParams {
@@ -2456,254 +2699,92 @@ export declare namespace Beta {
     /**
      * Header param: Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
+    betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
   export interface FindAllResultParams {
     /**
      * Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
+    betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
   export interface FindAllSchemaParams {
     /**
      * Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
+    betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
+
+  /**
+   * Backwards-compatible aliases (deprecated).
+   *
+   * Historically these types/resources were exported as `Findall*` (lowercase "a").
+   * The canonical names are now `FindAll*`.
+   */
+  export class Findall extends FindAll {}
+
+  /** @deprecated Use `FindAllCandidateMatchStatusEvent` instead. */
+  export type FindallCandidateMatchStatusEvent = FindAllCandidateMatchStatusEvent;
+  /** @deprecated Use `FindAllEnrichInput` instead. */
+  export type FindallEnrichInput = FindAllEnrichInput;
+  /** @deprecated Use `FindAllExtendInput` instead. */
+  export type FindallExtendInput = FindAllExtendInput;
+  /** @deprecated Use `FindAllRun` instead. */
+  export type FindallRun = FindAllRun;
+  /** @deprecated Use `FindAllRunInput` instead. */
+  export type FindallRunInput = FindAllRunInput;
+  /** @deprecated Use `FindAllRunResult` instead. */
+  export type FindallRunResult = FindAllRunResult;
+  /** @deprecated Use `FindAllRunStatusEvent` instead. */
+  export type FindallRunStatusEvent = FindAllRunStatusEvent;
+  /** @deprecated Use `FindAllSchema` instead. */
+  export type FindallSchema = FindAllSchema;
+  /** @deprecated Use `FindAllSchemaUpdatedEvent` instead. */
+  export type FindallSchemaUpdatedEvent = FindAllSchemaUpdatedEvent;
+  /** @deprecated Use `IngestInput` instead. */
+  export type FindallIngestInput = IngestInput;
+  /** @deprecated Use `FindAllCancelResponse` instead. */
+  export type FindallCancelResponse = FindAllCancelResponse;
+  /** @deprecated Use `FindAllEventsResponse` instead. */
+  export type FindallEventsResponse = FindAllEventsResponse;
+  /** @deprecated Use `FindAllCreateParams` instead. */
+  export type FindallCreateParams = FindAllCreateParams;
+  /** @deprecated Use `FindAllRetrieveParams` instead. */
+  export type FindallRetrieveParams = FindAllRetrieveParams;
+  /** @deprecated Use `FindAllCancelParams` instead. */
+  export type FindallCancelParams = FindAllCancelParams;
+  /** @deprecated Use `FindAllEnrichParams` instead. */
+  export type FindallEnrichParams = FindAllEnrichParams;
+  /** @deprecated Use `FindAllEventsParams` instead. */
+  export type FindallEventsParams = FindAllEventsParams;
+  /** @deprecated Use `FindAllExtendParams` instead. */
+  export type FindallExtendParams = FindAllExtendParams;
+  /** @deprecated Use `FindAllIngestParams` instead. */
+  export type FindallIngestParams = FindAllIngestParams;
+  /** @deprecated Use `FindAllResultParams` instead. */
+  export type FindallResultParams = FindAllResultParams;
+  /** @deprecated Use `FindAllSchemaParams` instead. */
+  export type FindallSchemaParams = FindAllSchemaParams;
 }
 
-/* =========================================
- * Client
- * ========================================= */
-
-export type LogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug';
-
-export type Logger = {
-  error: (message: string, ...rest: unknown[]) => void;
-  warn: (message: string, ...rest: unknown[]) => void;
-  info: (message: string, ...rest: unknown[]) => void;
-  debug: (message: string, ...rest: unknown[]) => void;
-};
-
-export interface ClientOptions {
-  /**
-   * Defaults to process.env['PARALLEL_API_KEY'].
-   */
-  apiKey?: string | undefined;
-
-  /**
-   * Override the default base URL for the API, e.g., "https://api.example.com/v2/"
-   *
-   * Defaults to process.env['PARALLEL_BASE_URL'].
-   */
-  baseURL?: string | null | undefined;
-
-  /**
-   * The maximum amount of time (in milliseconds) that the client should wait for a response
-   * from the server before timing out a single request.
-   *
-   * Note that request timeouts are retried by default, so in a worst-case scenario you may wait
-   * much longer than this timeout before the promise succeeds or fails.
-   *
-   * @unit milliseconds
-   */
-  timeout?: number | undefined;
-
-  /**
-   * Additional `RequestInit` options to be passed to `fetch` calls.
-   * Properties will be overridden by per-request `fetchOptions`.
-   */
-  fetchOptions?: RequestInit | undefined;
-
-  /**
-   * Specify a custom `fetch` function implementation.
-   *
-   * If not provided, we expect that `fetch` is defined globally.
-   */
-  fetch?: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-
-  /**
-   * The maximum number of times that the client will retry a request in case of a
-   * temporary failure, like a network error or a 5XX error from the server.
-   *
-   * @default 2
-   */
-  maxRetries?: number | undefined;
-
-  /**
-   * Default headers to include with every request to the API.
-   *
-   * These can be removed in individual requests by explicitly setting the
-   * header to `null` in request options.
-   */
-  defaultHeaders?: HeadersInit | undefined;
-
-  /**
-   * Default query parameters to include with every request to the API.
-   *
-   * These can be removed in individual requests by explicitly setting the
-   * param to `undefined` in request options.
-   */
-  defaultQuery?: Record<string, string | undefined> | undefined;
-
-  /**
-   * Set the log level.
-   *
-   * Defaults to process.env['PARALLEL_LOG'] or 'warn' if it isn't set.
-   */
-  logLevel?: LogLevel | undefined;
-
-  /**
-   * Set the logger.
-   *
-   * Defaults to globalThis.console.
-   */
-  logger?: Logger | undefined;
-}
-
-/**
- * API Client for interfacing with the Parallel API.
- */
-export default class Parallel {
-  constructor(options?: ClientOptions);
-
-  apiKey: string;
-  baseURL: string;
-  maxRetries: number;
-  timeout: number;
-  logger: Logger;
-  logLevel: LogLevel | undefined;
-  fetchOptions: RequestInit | undefined;
-
-  /**
-   * Create a new client instance re-using the same options given to the current client with optional overriding.
-   */
-  withOptions(options: Partial<ClientOptions>): this;
-
-  get<Rsp>(path: string, opts?: Parallel.RequestOptions | Promise<Parallel.RequestOptions>): APIPromise<Rsp>;
-  post<Rsp>(path: string, opts?: Parallel.RequestOptions | Promise<Parallel.RequestOptions>): APIPromise<Rsp>;
-  patch<Rsp>(path: string, opts?: Parallel.RequestOptions | Promise<Parallel.RequestOptions>): APIPromise<Rsp>;
-  put<Rsp>(path: string, opts?: Parallel.RequestOptions | Promise<Parallel.RequestOptions>): APIPromise<Rsp>;
-  delete<Rsp>(path: string, opts?: Parallel.RequestOptions | Promise<Parallel.RequestOptions>): APIPromise<Rsp>;
-
-  taskRun: TaskRun;
-  beta: Beta;
-
-  static DEFAULT_TIMEOUT: number;
-
-  static ParallelError: typeof ParallelError;
-  static APIError: typeof APIError;
-  static APIConnectionError: typeof APIConnectionError;
-  static APIConnectionTimeoutError: typeof APIConnectionTimeoutError;
-  static APIUserAbortError: typeof APIUserAbortError;
-  static NotFoundError: typeof NotFoundError;
-  static ConflictError: typeof ConflictError;
-  static RateLimitError: typeof RateLimitError;
-  static BadRequestError: typeof BadRequestError;
-  static AuthenticationError: typeof AuthenticationError;
-  static InternalServerError: typeof InternalServerError;
-  static PermissionDeniedError: typeof PermissionDeniedError;
-  static UnprocessableEntityError: typeof UnprocessableEntityError;
-
-  static toFile: typeof toFile;
-  static Beta: typeof Beta;
-}
-
-export declare namespace Parallel {
-  export type RequestOptions = {
-    /**
-     * The HTTP method for the request (e.g., 'get', 'post', 'put', 'delete').
-     */
-    method?: 'get' | 'post' | 'put' | 'patch' | 'delete';
-
-    /**
-     * The URL path for the request.
-     *
-     * @example "/v1/foo"
-     */
-    path?: string;
-
-    /**
-     * Query parameters to include in the request URL.
-     */
-    query?: object | undefined | null;
-
-    /**
-     * The request body. Can be a string, JSON object, FormData, or other supported types.
-     */
-    body?: unknown;
-
-    /**
-     * HTTP headers to include with the request. Can be a Headers object, plain object, or array of tuples.
-     */
-    headers?: HeadersInit | undefined | null;
-
-    /**
-     * The maximum number of times that the client will retry a request in case of a
-     * temporary failure, like a network error or a 5XX error from the server.
-     *
-     * @default 2
-     */
-    maxRetries?: number;
-
-    stream?: boolean | undefined;
-
-    /**
-     * The maximum amount of time (in milliseconds) that the client should wait for a response
-     * from the server before timing out a single request.
-     *
-     * @unit milliseconds
-     */
-    timeout?: number;
-
-    /**
-     * Additional `RequestInit` options to be passed to the underlying `fetch` call.
-     * These options will be merged with the client's default fetch options.
-     */
-    fetchOptions?: RequestInit;
-
-    /**
-     * An AbortSignal that can be used to cancel the request.
-     */
-    signal?: AbortSignal | undefined | null;
-
-    /**
-     * A unique key for this request to enable idempotency.
-     */
-    idempotencyKey?: string;
-
-    /**
-     * Override the default base URL for this specific request.
-     */
-    defaultBaseURL?: string | undefined;
-
-    __binaryResponse?: boolean | undefined;
-    __streamClass?: typeof Stream;
-  };
-
-  export type TaskRun = TaskRunObject;
-  export type AutoSchema = import('./parallel-sdk-footprint').AutoSchema;
-  export type Citation = import('./parallel-sdk-footprint').Citation;
-  export type FieldBasis = import('./parallel-sdk-footprint').FieldBasis;
-  export type JsonSchema = import('./parallel-sdk-footprint').JsonSchema;
-  export type RunInput = import('./parallel-sdk-footprint').RunInput;
-  export type TaskRunJsonOutput = import('./parallel-sdk-footprint').TaskRunJsonOutput;
-  export type TaskRunResult = import('./parallel-sdk-footprint').TaskRunResult;
-  export type TaskRunTextOutput = import('./parallel-sdk-footprint').TaskRunTextOutput;
-  export type TaskSpec = import('./parallel-sdk-footprint').TaskSpec;
-  export type TextSchema = import('./parallel-sdk-footprint').TextSchema;
-  export type TaskRunCreateParams = import('./parallel-sdk-footprint').TaskRunCreateParams;
-  export type TaskRunResultParams = import('./parallel-sdk-footprint').TaskRunResultParams;
-
-  export type ErrorObject = import('./parallel-sdk-footprint').ErrorObject;
-  export type ErrorResponse = import('./parallel-sdk-footprint').ErrorResponse;
-  export type SourcePolicy = import('./parallel-sdk-footprint').SourcePolicy;
-  export type Warning = import('./parallel-sdk-footprint').Warning;
-
-  export { Beta };
+declare module 'parallel/resources/index' {
+  export * from './shared';
+  export { Beta } from './beta/beta';
+  export {
+    TaskRun,
+    type AutoSchema,
+    type Citation,
+    type FieldBasis,
+    type JsonSchema,
+    type RunInput,
+    type TaskRunJsonOutput,
+    type TaskRunResult,
+    type TaskRunTextOutput,
+    type TaskSpec,
+    type TextSchema,
+    type TaskRunCreateParams,
+    type TaskRunResultParams,
+  } from './task-run';
 }
 ```
-
-If you want, I can also produce a second “LLM-friendly” variant that **removes TS-only noise** (like `import('./parallel-sdk-footprint')` self-references, `HeadersInit` vs `HeadersLike`, etc.) and instead presents the API as a compact interface map (client → resources → endpoints), while still embedding the original doc-comments verbatim.
