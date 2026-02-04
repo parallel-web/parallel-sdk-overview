@@ -1,16 +1,14 @@
 ```ts
 // parallel-sdk-footprint.d.ts
-// Summarized public API surface for the Parallel TypeScript SDK.
-// Doc-comments are copied 1:1 where available from the provided sources.
+// Summarized public TypeScript declaration footprint for the SDK.
+// Doc-comments are copied over 1:1 where present in the provided source.
 
-declare module 'parallel' {
+declare module 'parallel-sdk' {
   export { Parallel as default } from './client';
 
   export { type Uploadable, toFile } from './core/uploads';
   export { APIPromise } from './core/api-promise';
-
   export { Parallel, type ClientOptions } from './client';
-
   export {
     ParallelError,
     APIError,
@@ -36,9 +34,52 @@ declare module './version' {
 
 declare module './core/resource' {
   import type { Parallel } from './client';
+
   export abstract class APIResource {
     protected _client: Parallel;
     constructor(client: Parallel);
+  }
+}
+
+declare module './core/uploads' {
+  export { type Uploadable } from './internal/uploads';
+  export { toFile, type ToFileInput } from './internal/to-file';
+}
+
+declare module './core/api-promise' {
+  import { type Parallel } from './client';
+
+  /**
+   * A subclass of `Promise` providing additional helper methods
+   * for interacting with the SDK.
+   */
+  export class APIPromise<T> extends Promise<T> {
+    constructor(client: Parallel, responsePromise: Promise<any>, parseResponse?: any);
+
+    /**
+     * Gets the raw `Response` instance instead of parsing the response
+     * data.
+     *
+     * If you want to parse the response body but still get the `Response`
+     * instance, you can use {@link withResponse()}.
+     *
+     * 👋 Getting the wrong TypeScript type for `Response`?
+     * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
+     * to your `tsconfig.json`.
+     */
+    asResponse(): Promise<Response>;
+
+    /**
+     * Gets the parsed response data and the raw `Response` instance.
+     *
+     * If you just want to get the raw `Response` instance without parsing it,
+     * you can use {@link asResponse()}.
+     *
+     * 👋 Getting the wrong TypeScript type for `Response`?
+     * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
+     * to your `tsconfig.json`.
+     */
+    withResponse(): Promise<{ data: T; response: Response }>;
   }
 }
 
@@ -89,51 +130,10 @@ declare module './core/error' {
   export class InternalServerError extends APIError<number, Headers> {}
 }
 
-declare module './core/api-promise' {
-  import type { Parallel } from './client';
-
-  /**
-   * A subclass of `Promise` providing additional helper methods
-   * for interacting with the SDK.
-   */
-  export class APIPromise<T> extends Promise<T> {
-    constructor(
-      client: Parallel,
-      responsePromise: Promise<any>,
-      parseResponse?: (client: Parallel, props: any) => any,
-    );
-
-    /**
-     * Gets the raw `Response` instance instead of parsing the response
-     * data.
-     *
-     * If you want to parse the response body but still get the `Response`
-     * instance, you can use {@link withResponse()}.
-     *
-     * 👋 Getting the wrong TypeScript type for `Response`?
-     * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
-     * to your `tsconfig.json`.
-     */
-    asResponse(): Promise<Response>;
-
-    /**
-     * Gets the parsed response data and the raw `Response` instance.
-     *
-     * If you just want to get the raw `Response` instance without parsing it,
-     * you can use {@link asResponse()}.
-     *
-     * 👋 Getting the wrong TypeScript type for `Response`?
-     * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
-     * to your `tsconfig.json`.
-     */
-    withResponse(): Promise<{ data: T; response: Response }>;
-  }
-}
-
 declare module './core/streaming' {
-  import type { Parallel } from './client';
-  import type { ReadableStream } from './internal/shim-types';
-
+  /**
+   * NOTE: Stream items are expected to be JSON values when created from SSE or newline streams.
+   */
   export type ServerSentEvent = {
     event: string | null;
     data: string;
@@ -143,19 +143,15 @@ declare module './core/streaming' {
   export class Stream<Item> implements AsyncIterable<Item> {
     controller: AbortController;
 
-    constructor(iterator: () => AsyncIterator<Item>, controller: AbortController, client?: Parallel);
+    constructor(iterator: () => AsyncIterator<Item>, controller: AbortController, client?: any);
 
-    static fromSSEResponse<Item>(response: Response, controller: AbortController, client?: Parallel): Stream<Item>;
+    static fromSSEResponse<Item>(response: Response, controller: AbortController, client?: any): Stream<Item>;
 
     /**
      * Generates a Stream from a newline-separated ReadableStream
      * where each item is a JSON value.
      */
-    static fromReadableStream<Item>(
-      readableStream: ReadableStream,
-      controller: AbortController,
-      client?: Parallel,
-    ): Stream<Item>;
+    static fromReadableStream<Item>(readableStream: ReadableStream, controller: AbortController, client?: any): Stream<Item>;
 
     [Symbol.asyncIterator](): AsyncIterator<Item>;
 
@@ -172,158 +168,6 @@ declare module './core/streaming' {
      */
     toReadableStream(): ReadableStream;
   }
-}
-
-declare module './core/uploads' {
-  export { type Uploadable } from './internal/uploads';
-  export { toFile, type ToFileInput } from './internal/to-file';
-}
-
-declare module './internal/shim-types' {
-  /**
-   * Shims for types that we can't always rely on being available globally.
-   *
-   * Note: these only exist at the type-level, there is no corresponding runtime
-   * version for any of these symbols.
-   */
-  export type ReadableStream<R = any> = any;
-}
-
-declare module './internal/headers' {
-  type HeaderValue = string | undefined | null;
-
-  export type HeadersLike =
-    | Headers
-    | readonly HeaderValue[][]
-    | Record<string, HeaderValue | readonly HeaderValue[]>
-    | undefined
-    | null
-    | NullableHeaders;
-
-  /**
-   * @internal
-   * Users can pass explicit nulls to unset default headers. When we parse them
-   * into a standard headers type we need to preserve that information.
-   */
-  export type NullableHeaders = {
-    /** Parsed headers. */
-    values: Headers;
-    /** Set of lowercase header names explicitly set to null. */
-    nulls: Set<string>;
-    /** Brand check, prevent users from creating a NullableHeaders. */
-    readonly [k: symbol]: true;
-  };
-
-  export const buildHeaders: (newHeaders: HeadersLike[]) => NullableHeaders;
-  export const isEmptyHeaders: (headers: HeadersLike) => boolean;
-}
-
-declare module './internal/request-options' {
-  import type { Stream } from './core/streaming';
-  import type { HeadersLike } from './internal/headers';
-  import type { HTTPMethod, MergedRequestInit } from './internal/types';
-
-  export type RequestOptions = {
-    /**
-     * The HTTP method for the request (e.g., 'get', 'post', 'put', 'delete').
-     */
-    method?: HTTPMethod;
-
-    /**
-     * The URL path for the request.
-     *
-     * @example "/v1/foo"
-     */
-    path?: string;
-
-    /**
-     * Query parameters to include in the request URL.
-     */
-    query?: object | undefined | null;
-
-    /**
-     * The request body. Can be a string, JSON object, FormData, or other supported types.
-     */
-    body?: unknown;
-
-    /**
-     * HTTP headers to include with the request. Can be a Headers object, plain object, or array of tuples.
-     */
-    headers?: HeadersLike;
-
-    /**
-     * The maximum number of times that the client will retry a request in case of a
-     * temporary failure, like a network error or a 5XX error from the server.
-     *
-     * @default 2
-     */
-    maxRetries?: number;
-
-    stream?: boolean | undefined;
-
-    /**
-     * The maximum amount of time (in milliseconds) that the client should wait for a response
-     * from the server before timing out a single request.
-     *
-     * @unit milliseconds
-     */
-    timeout?: number;
-
-    /**
-     * Additional `RequestInit` options to be passed to the underlying `fetch` call.
-     * These options will be merged with the client's default fetch options.
-     */
-    fetchOptions?: MergedRequestInit;
-
-    /**
-     * An AbortSignal that can be used to cancel the request.
-     */
-    signal?: AbortSignal | undefined | null;
-
-    /**
-     * A unique key for this request to enable idempotency.
-     */
-    idempotencyKey?: string;
-
-    /**
-     * Override the default base URL for this specific request.
-     */
-    defaultBaseURL?: string | undefined;
-
-    __binaryResponse?: boolean | undefined;
-    __streamClass?: typeof Stream;
-  };
-
-  export type FinalRequestOptions = RequestOptions & { method: HTTPMethod; path: string };
-}
-
-declare module './internal/uploads' {
-  // Publicly re-exported via ./core/uploads
-  export type Uploadable = File | Response | (AsyncIterable<Uint8Array> & { path: string | { toString(): string } }) | Blob;
-
-  export const checkFileSupport: () => void;
-  export function makeFile(fileBits: Array<any>, fileName: string | undefined, options?: any): File;
-}
-
-declare module './internal/to-file' {
-  import type { FilePropertyBag } from './internal/builtin-types';
-
-  /**
-   * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
-   * @param value the raw content of the file. Can be an {@link Uploadable}, BlobLikePart, or AsyncIterable of BlobLikeParts
-   * @param {string=} name the name of the file. If omitted, toFile will try to determine a file name from bits if possible
-   * @param {Object=} options additional properties
-   * @param {string=} options.type the MIME type of the content
-   * @param {number=} options.lastModified the last modified timestamp
-   * @returns a {@link File} with the given properties
-   */
-  export function toFile(
-    value: ToFileInput | PromiseLike<ToFileInput>,
-    name?: string | null | undefined,
-    options?: FilePropertyBag | undefined,
-  ): Promise<File>;
-
-  export type ToFileInput = any;
 }
 
 declare module './resources/shared' {
@@ -415,7 +259,7 @@ declare module './resources/shared' {
 }
 
 declare module './resources/task-run' {
-  import type * as Shared from './resources/shared';
+  import type * as Shared from './shared';
   import { APIResource } from './core/resource';
   import { APIPromise } from './core/api-promise';
   import type { RequestOptions } from './internal/request-options';
@@ -782,9 +626,461 @@ declare module './resources/task-run' {
   }
 }
 
+declare module './resources/beta/beta' {
+  import type * as Shared from './resources/shared';
+  import { APIResource } from './core/resource';
+  import { APIPromise } from './core/api-promise';
+  import type { RequestOptions } from './internal/request-options';
+
+  import type {
+    FindAll as FindAllResource,
+    FindAllCancelParams,
+    FindAllCancelResponse,
+    FindAllCandidateMatchStatusEvent,
+    FindAllCreateParams,
+    FindAllEnrichInput,
+    FindAllEnrichParams,
+    FindAllEventsParams,
+    FindAllEventsResponse,
+    FindAllExtendInput,
+    FindAllExtendParams,
+    FindAllIngestParams,
+    FindAllResultParams,
+    FindAllRetrieveParams,
+    FindAllRun,
+    FindAllRunInput,
+    FindAllRunResult,
+    FindAllRunStatusEvent,
+    FindAllSchema,
+    FindAllSchemaParams,
+    FindAllSchemaUpdatedEvent,
+    IngestInput,
+  } from './resources/beta/findall';
+
+  import type {
+    TaskGroup as TaskGroupResource,
+    TaskGroupAddRunsParams,
+    TaskGroupCreateParams,
+    TaskGroupEventsParams,
+    TaskGroupEventsResponse,
+    TaskGroupGetRunsParams,
+    TaskGroupGetRunsResponse,
+    TaskGroupRunResponse,
+    TaskGroupStatus,
+  } from './resources/beta/task-group';
+
+  import type {
+    TaskRun as BetaTaskRunResource,
+    BetaRunInput,
+    BetaTaskRunResult,
+    ErrorEvent,
+    McpServer,
+    McpToolCall,
+    ParallelBeta,
+    TaskRunEvent,
+    TaskRunEventsResponse,
+    TaskRunCreateParams,
+    TaskRunResultParams,
+    Webhook,
+  } from './resources/beta/task-run';
+
+  /**
+   * Optional settings for returning relevant excerpts.
+   */
+  export interface ExcerptSettings {
+    /**
+     * Optional upper bound on the total number of characters to include per url.
+     * Excerpts may contain fewer characters than this limit to maximize relevance and
+     * token efficiency, but will never contain fewer than 1000 characters per result.
+     */
+    max_chars_per_result?: number | null;
+
+    /**
+     * Optional upper bound on the total number of characters to include across all
+     * urls. Results may contain fewer characters than this limit to maximize relevance
+     * and token efficiency, but will never contain fewer than 1000 characters per
+     * result.This overall limit applies in addition to max_chars_per_result.
+     */
+    max_chars_total?: number | null;
+  }
+
+  /**
+   * Extract error details.
+   */
+  export interface ExtractError {
+    /**
+     * Content returned for http client or server errors, if any.
+     */
+    content: string | null;
+
+    /**
+     * Error type.
+     */
+    error_type: string;
+
+    /**
+     * HTTP status code, if available.
+     */
+    http_status_code: number | null;
+
+    url: string;
+  }
+
+  /**
+   * Fetch result.
+   */
+  export interface ExtractResponse {
+    /**
+     * Extract errors: requested URLs not in the results.
+     */
+    errors: Array<ExtractError>;
+
+    /**
+     * Extract request ID, e.g. `extract_cad0a6d2dec046bd95ae900527d880e7`
+     */
+    extract_id: string;
+
+    /**
+     * Successful extract results.
+     */
+    results: Array<ExtractResult>;
+
+    /**
+     * Usage metrics for the extract request.
+     */
+    usage?: Array<UsageItem> | null;
+
+    /**
+     * Warnings for the extract request, if any.
+     */
+    warnings?: Array<Shared.Warning> | null;
+  }
+
+  /**
+   * Extract result for a single URL.
+   */
+  export interface ExtractResult {
+    /**
+     * URL associated with the search result.
+     */
+    url: string;
+
+    /**
+     * Relevant excerpted content from the URL, formatted as markdown.
+     */
+    excerpts?: Array<string> | null;
+
+    /**
+     * Full content from the URL formatted as markdown, if requested.
+     */
+    full_content?: string | null;
+
+    /**
+     * Publish date of the webpage in YYYY-MM-DD format, if available.
+     */
+    publish_date?: string | null;
+
+    /**
+     * Title of the webpage, if available.
+     */
+    title?: string | null;
+  }
+
+  /**
+   * Policy for live fetching web results.
+   */
+  export interface FetchPolicy {
+    /**
+     * If false, fallback to cached content older than max-age if live fetch fails or
+     * times out. If true, returns an error instead.
+     */
+    disable_cache_fallback?: boolean;
+
+    /**
+     * Maximum age of cached content in seconds to trigger a live fetch. Minimum value
+     * 600 seconds (10 minutes).
+     */
+    max_age_seconds?: number | null;
+
+    /**
+     * Timeout in seconds for fetching live content if unavailable in cache.
+     */
+    timeout_seconds?: number | null;
+  }
+
+  /**
+   * Output for the Search API.
+   */
+  export interface SearchResult {
+    /**
+     * A list of WebSearchResult objects, ordered by decreasing relevance.
+     */
+    results: Array<WebSearchResult>;
+
+    /**
+     * Search ID. Example: `search_cad0a6d2dec046bd95ae900527d880e7`
+     */
+    search_id: string;
+
+    /**
+     * Usage metrics for the search request.
+     */
+    usage?: Array<UsageItem> | null;
+
+    /**
+     * Warnings for the search request, if any.
+     */
+    warnings?: Array<Shared.Warning> | null;
+  }
+
+  /**
+   * Usage item for a single operation.
+   */
+  export interface UsageItem {
+    /**
+     * Count of the SKU.
+     */
+    count: number;
+
+    /**
+     * Name of the SKU.
+     */
+    name: string;
+  }
+
+  /**
+   * A single search result from the web search API.
+   */
+  export interface WebSearchResult {
+    /**
+     * URL associated with the search result.
+     */
+    url: string;
+
+    /**
+     * Relevant excerpted content from the URL, formatted as markdown.
+     */
+    excerpts?: Array<string> | null;
+
+    /**
+     * Publish date of the webpage in YYYY-MM-DD format, if available.
+     */
+    publish_date?: string | null;
+
+    /**
+     * Title of the webpage, if available.
+     */
+    title?: string | null;
+  }
+
+  export interface BetaExtractParams {
+    /**
+     * Body param
+     */
+    urls: Array<string>;
+
+    /**
+     * Body param: Include excerpts from each URL relevant to the search objective and
+     * queries. Note that if neither objective nor search_queries is provided, excerpts
+     * are redundant with full content.
+     */
+    excerpts?: boolean | ExcerptSettings;
+
+    /**
+     * Body param: Policy for live fetching web results.
+     */
+    fetch_policy?: FetchPolicy | null;
+
+    /**
+     * Body param: Include full content from each URL. Note that if neither objective
+     * nor search_queries is provided, excerpts are redundant with full content.
+     */
+    full_content?: boolean | BetaExtractParams.FullContentSettings;
+
+    /**
+     * Body param: If provided, focuses extracted content on the specified search
+     * objective.
+     */
+    objective?: string | null;
+
+    /**
+     * Body param: If provided, focuses extracted content on the specified keyword
+     * search queries.
+     */
+    search_queries?: Array<string> | null;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  export namespace BetaExtractParams {
+    /**
+     * Optional settings for returning full content.
+     */
+    export interface FullContentSettings {
+      /**
+       * Optional limit on the number of characters to include in the full content for
+       * each url. Full content always starts at the beginning of the page and is
+       * truncated at the limit if necessary.
+       */
+      max_chars_per_result?: number | null;
+    }
+  }
+
+  export interface BetaSearchParams {
+    /**
+     * Body param: Optional settings to configure excerpt generation.
+     */
+    excerpts?: ExcerptSettings;
+
+    /**
+     * Body param: Policy for live fetching web results.
+     */
+    fetch_policy?: FetchPolicy | null;
+
+    /**
+     * @deprecated Body param: DEPRECATED: Use `excerpts.max_chars_per_result` instead.
+     */
+    max_chars_per_result?: number | null;
+
+    /**
+     * Body param: Upper bound on the number of results to return. May be limited by
+     * the processor. Defaults to 10 if not provided.
+     */
+    max_results?: number | null;
+
+    /**
+     * Body param: Presets default values for parameters for different use cases.
+     * `one-shot` returns more comprehensive results and longer excerpts to answer
+     * questions from a single response, while `agentic` returns more concise,
+     * token-efficient results for use in an agentic loop.
+     */
+    mode?: 'one-shot' | 'agentic' | null;
+
+    /**
+     * Body param: Natural-language description of what the web search is trying to
+     * find. May include guidance about preferred sources or freshness. At least one of
+     * objective or search_queries must be provided.
+     */
+    objective?: string | null;
+
+    /**
+     * @deprecated Body param: DEPRECATED: use `mode` instead.
+     */
+    processor?: 'base' | 'pro' | null;
+
+    /**
+     * Body param: Optional list of traditional keyword search queries to guide the
+     * search. May contain search operators. At least one of objective or
+     * search_queries must be provided.
+     */
+    search_queries?: Array<string> | null;
+
+    /**
+     * Body param: Source policy for web search results.
+     *
+     * This policy governs which sources are allowed/disallowed in results.
+     */
+    source_policy?: Shared.SourcePolicy | null;
+
+    /**
+     * Header param: Optional header to specify the beta version(s) to enable.
+     */
+    betas?: Array<ParallelBeta>;
+  }
+
+  export class Beta extends APIResource {
+    taskRun: BetaTaskRunResource;
+    taskGroup: TaskGroupResource;
+    findall: FindAllResource;
+
+    /**
+     * Extracts relevant content from specific web URLs.
+     *
+     * To access this endpoint, pass the `parallel-beta` header with the value
+     * `search-extract-2025-10-10`.
+     */
+    extract(params: BetaExtractParams, options?: RequestOptions): APIPromise<ExtractResponse>;
+
+    /**
+     * Searches the web.
+     *
+     * To access this endpoint, pass the `parallel-beta` header with the value
+     * `search-extract-2025-10-10`.
+     */
+    search(params: BetaSearchParams, options?: RequestOptions): APIPromise<SearchResult>;
+  }
+
+  export namespace Beta {
+    export {
+      // Beta top-level types
+      ExcerptSettings,
+      ExtractError,
+      ExtractResponse,
+      ExtractResult,
+      FetchPolicy,
+      SearchResult,
+      UsageItem,
+      WebSearchResult,
+      BetaExtractParams,
+      BetaSearchParams,
+
+      // Beta.TaskRun subresource + types
+      BetaRunInput,
+      BetaTaskRunResult,
+      ErrorEvent,
+      McpServer,
+      McpToolCall,
+      ParallelBeta,
+      TaskRunEvent,
+      Webhook,
+      TaskRunEventsResponse,
+      TaskRunCreateParams,
+      TaskRunResultParams,
+
+      // Beta.TaskGroup subresource + types
+      TaskGroup,
+      TaskGroupRunResponse,
+      TaskGroupStatus,
+      TaskGroupEventsResponse,
+      TaskGroupGetRunsResponse,
+      TaskGroupCreateParams,
+      TaskGroupAddRunsParams,
+      TaskGroupEventsParams,
+      TaskGroupGetRunsParams,
+
+      // Beta.FindAll subresource + types
+      FindAll,
+      FindAllCandidateMatchStatusEvent,
+      FindAllEnrichInput,
+      FindAllExtendInput,
+      FindAllRun,
+      FindAllRunInput,
+      FindAllRunResult,
+      FindAllRunStatusEvent,
+      FindAllSchema,
+      FindAllSchemaUpdatedEvent,
+      IngestInput,
+      FindAllCancelResponse,
+      FindAllEventsResponse,
+      FindAllCreateParams,
+      FindAllRetrieveParams,
+      FindAllCancelParams,
+      FindAllEnrichParams,
+      FindAllEventsParams,
+      FindAllExtendParams,
+      FindAllIngestParams,
+      FindAllResultParams,
+      FindAllSchemaParams,
+    };
+  }
+}
+
 declare module './resources/beta/task-run' {
-  import * as Shared from './resources/shared';
-  import * as TaskRunAPI from './resources/task-run';
+  import type * as Shared from './resources/shared';
+  import type * as TaskRunAPI from './resources/task-run';
   import { APIResource } from './core/resource';
   import { APIPromise } from './core/api-promise';
   import { Stream } from './core/streaming';
@@ -814,11 +1110,7 @@ declare module './resources/beta/task-run' {
     /**
      * Retrieves a run result by run_id, blocking until the run is completed.
      */
-    result(
-      runID: string,
-      params?: TaskRunResultParams | null | undefined,
-      options?: RequestOptions,
-    ): APIPromise<BetaTaskRunResult>;
+    result(runID: string, params?: TaskRunResultParams | null | undefined, options?: RequestOptions): APIPromise<BetaTaskRunResult>;
   }
 
   /**
@@ -1273,8 +1565,8 @@ declare module './resources/beta/task-group' {
   import { APIPromise } from './core/api-promise';
   import { Stream } from './core/streaming';
   import type { RequestOptions } from './internal/request-options';
-  import * as TaskRunAPI from './resources/task-run';
-  import * as BetaTaskRunAPI from './resources/beta/task-run';
+  import type * as TaskRunAPI from './resources/task-run';
+  import type * as BetaTaskRunAPI from './resources/beta/task-run';
 
   export class TaskGroup extends APIResource {
     /**
@@ -1484,8 +1776,8 @@ declare module './resources/beta/findall' {
   import { APIPromise } from './core/api-promise';
   import { Stream } from './core/streaming';
   import type { RequestOptions } from './internal/request-options';
-  import * as TaskRunAPI from './resources/task-run';
-  import * as BetaTaskRunAPI from './resources/beta/task-run';
+  import type * as TaskRunAPI from './resources/task-run';
+  import type * as BetaTaskRunAPI from './resources/beta/task-run';
 
   export class FindAll extends APIResource {
     /**
@@ -1554,9 +1846,6 @@ declare module './resources/beta/findall' {
      */
     schema(findallID: string, params?: FindAllSchemaParams | null | undefined, options?: RequestOptions): APIPromise<FindAllSchema>;
   }
-
-  // Backwards-compatible resource alias (deprecated)
-  export class Findall extends FindAll {}
 
   /**
    * Event containing a candidate whose match status has changed.
@@ -2204,7 +2493,14 @@ declare module './resources/beta/findall' {
     betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
-  // Deprecated aliases (types)
+  /**
+   * Backwards-compatible aliases (deprecated).
+   *
+   * Historically these types/resources were exported as `Findall*` (lowercase "a").
+   * The canonical names are now `FindAll*`.
+   */
+  export class Findall extends FindAll {}
+
   /** @deprecated Use `FindAllCandidateMatchStatusEvent` instead. */
   export type FindallCandidateMatchStatusEvent = FindAllCandidateMatchStatusEvent;
   /** @deprecated Use `FindAllEnrichInput` instead. */
@@ -2249,345 +2545,6 @@ declare module './resources/beta/findall' {
   export type FindallSchemaParams = FindAllSchemaParams;
 }
 
-declare module './resources/beta/beta' {
-  import { APIResource } from './core/resource';
-  import { APIPromise } from './core/api-promise';
-  import type { RequestOptions } from './internal/request-options';
-  import * as Shared from './resources/shared';
-  import * as TaskRunAPI from './resources/beta/task-run';
-  import * as FindAllAPI from './resources/beta/findall';
-  import * as TaskGroupAPI from './resources/beta/task-group';
-
-  export class Beta extends APIResource {
-    taskRun: TaskRunAPI.TaskRun;
-    taskGroup: TaskGroupAPI.TaskGroup;
-    findall: FindAllAPI.FindAll;
-
-    /**
-     * Extracts relevant content from specific web URLs.
-     *
-     * To access this endpoint, pass the `parallel-beta` header with the value
-     * `search-extract-2025-10-10`.
-     */
-    extract(params: BetaExtractParams, options?: RequestOptions): APIPromise<ExtractResponse>;
-
-    /**
-     * Searches the web.
-     *
-     * To access this endpoint, pass the `parallel-beta` header with the value
-     * `search-extract-2025-10-10`.
-     */
-    search(params: BetaSearchParams, options?: RequestOptions): APIPromise<SearchResult>;
-  }
-
-  /**
-   * Optional settings for returning relevant excerpts.
-   */
-  export interface ExcerptSettings {
-    /**
-     * Optional upper bound on the total number of characters to include per url.
-     * Excerpts may contain fewer characters than this limit to maximize relevance and
-     * token efficiency, but will never contain fewer than 1000 characters per result.
-     */
-    max_chars_per_result?: number | null;
-
-    /**
-     * Optional upper bound on the total number of characters to include across all
-     * urls. Results may contain fewer characters than this limit to maximize relevance
-     * and token efficiency, but will never contain fewer than 1000 characters per
-     * result.This overall limit applies in addition to max_chars_per_result.
-     */
-    max_chars_total?: number | null;
-  }
-
-  /**
-   * Extract error details.
-   */
-  export interface ExtractError {
-    /**
-     * Content returned for http client or server errors, if any.
-     */
-    content: string | null;
-
-    /**
-     * Error type.
-     */
-    error_type: string;
-
-    /**
-     * HTTP status code, if available.
-     */
-    http_status_code: number | null;
-
-    url: string;
-  }
-
-  /**
-   * Fetch result.
-   */
-  export interface ExtractResponse {
-    /**
-     * Extract errors: requested URLs not in the results.
-     */
-    errors: Array<ExtractError>;
-
-    /**
-     * Extract request ID, e.g. `extract_cad0a6d2dec046bd95ae900527d880e7`
-     */
-    extract_id: string;
-
-    /**
-     * Successful extract results.
-     */
-    results: Array<ExtractResult>;
-
-    /**
-     * Usage metrics for the extract request.
-     */
-    usage?: Array<UsageItem> | null;
-
-    /**
-     * Warnings for the extract request, if any.
-     */
-    warnings?: Array<Shared.Warning> | null;
-  }
-
-  /**
-   * Extract result for a single URL.
-   */
-  export interface ExtractResult {
-    /**
-     * URL associated with the search result.
-     */
-    url: string;
-
-    /**
-     * Relevant excerpted content from the URL, formatted as markdown.
-     */
-    excerpts?: Array<string> | null;
-
-    /**
-     * Full content from the URL formatted as markdown, if requested.
-     */
-    full_content?: string | null;
-
-    /**
-     * Publish date of the webpage in YYYY-MM-DD format, if available.
-     */
-    publish_date?: string | null;
-
-    /**
-     * Title of the webpage, if available.
-     */
-    title?: string | null;
-  }
-
-  /**
-   * Policy for live fetching web results.
-   */
-  export interface FetchPolicy {
-    /**
-     * If false, fallback to cached content older than max-age if live fetch fails or
-     * times out. If true, returns an error instead.
-     */
-    disable_cache_fallback?: boolean;
-
-    /**
-     * Maximum age of cached content in seconds to trigger a live fetch. Minimum value
-     * 600 seconds (10 minutes).
-     */
-    max_age_seconds?: number | null;
-
-    /**
-     * Timeout in seconds for fetching live content if unavailable in cache.
-     */
-    timeout_seconds?: number | null;
-  }
-
-  /**
-   * Output for the Search API.
-   */
-  export interface SearchResult {
-    /**
-     * A list of WebSearchResult objects, ordered by decreasing relevance.
-     */
-    results: Array<WebSearchResult>;
-
-    /**
-     * Search ID. Example: `search_cad0a6d2dec046bd95ae900527d880e7`
-     */
-    search_id: string;
-
-    /**
-     * Usage metrics for the search request.
-     */
-    usage?: Array<UsageItem> | null;
-
-    /**
-     * Warnings for the search request, if any.
-     */
-    warnings?: Array<Shared.Warning> | null;
-  }
-
-  /**
-   * Usage item for a single operation.
-   */
-  export interface UsageItem {
-    /**
-     * Count of the SKU.
-     */
-    count: number;
-
-    /**
-     * Name of the SKU.
-     */
-    name: string;
-  }
-
-  /**
-   * A single search result from the web search API.
-   */
-  export interface WebSearchResult {
-    /**
-     * URL associated with the search result.
-     */
-    url: string;
-
-    /**
-     * Relevant excerpted content from the URL, formatted as markdown.
-     */
-    excerpts?: Array<string> | null;
-
-    /**
-     * Publish date of the webpage in YYYY-MM-DD format, if available.
-     */
-    publish_date?: string | null;
-
-    /**
-     * Title of the webpage, if available.
-     */
-    title?: string | null;
-  }
-
-  export interface BetaExtractParams {
-    /**
-     * Body param
-     */
-    urls: Array<string>;
-
-    /**
-     * Body param: Include excerpts from each URL relevant to the search objective and
-     * queries. Note that if neither objective nor search_queries is provided, excerpts
-     * are redundant with full content.
-     */
-    excerpts?: boolean | ExcerptSettings;
-
-    /**
-     * Body param: Policy for live fetching web results.
-     */
-    fetch_policy?: FetchPolicy | null;
-
-    /**
-     * Body param: Include full content from each URL. Note that if neither objective
-     * nor search_queries is provided, excerpts are redundant with full content.
-     */
-    full_content?: boolean | BetaExtractParams.FullContentSettings;
-
-    /**
-     * Body param: If provided, focuses extracted content on the specified search
-     * objective.
-     */
-    objective?: string | null;
-
-    /**
-     * Body param: If provided, focuses extracted content on the specified keyword
-     * search queries.
-     */
-    search_queries?: Array<string> | null;
-
-    /**
-     * Header param: Optional header to specify the beta version(s) to enable.
-     */
-    betas?: Array<TaskRunAPI.ParallelBeta>;
-  }
-
-  export namespace BetaExtractParams {
-    /**
-     * Optional settings for returning full content.
-     */
-    export interface FullContentSettings {
-      /**
-       * Optional limit on the number of characters to include in the full content for
-       * each url. Full content always starts at the beginning of the page and is
-       * truncated at the limit if necessary.
-       */
-      max_chars_per_result?: number | null;
-    }
-  }
-
-  export interface BetaSearchParams {
-    /**
-     * Body param: Optional settings to configure excerpt generation.
-     */
-    excerpts?: ExcerptSettings;
-
-    /**
-     * Body param: Policy for live fetching web results.
-     */
-    fetch_policy?: FetchPolicy | null;
-
-    /**
-     * @deprecated Body param: DEPRECATED: Use `excerpts.max_chars_per_result` instead.
-     */
-    max_chars_per_result?: number | null;
-
-    /**
-     * Body param: Upper bound on the number of results to return. May be limited by
-     * the processor. Defaults to 10 if not provided.
-     */
-    max_results?: number | null;
-
-    /**
-     * Body param: Presets default values for parameters for different use cases.
-     * `one-shot` returns more comprehensive results and longer excerpts to answer
-     * questions from a single response, while `agentic` returns more concise,
-     * token-efficient results for use in an agentic loop.
-     */
-    mode?: 'one-shot' | 'agentic' | null;
-
-    /**
-     * Body param: Natural-language description of what the web search is trying to
-     * find. May include guidance about preferred sources or freshness. At least one of
-     * objective or search_queries must be provided.
-     */
-    objective?: string | null;
-
-    /**
-     * @deprecated Body param: DEPRECATED: use `mode` instead.
-     */
-    processor?: 'base' | 'pro' | null;
-
-    /**
-     * Body param: Optional list of traditional keyword search queries to guide the
-     * search. May contain search operators. At least one of objective or
-     * search_queries must be provided.
-     */
-    search_queries?: Array<string> | null;
-
-    /**
-     * Body param: Source policy for web search results.
-     *
-     * This policy governs which sources are allowed/disallowed in results.
-     */
-    source_policy?: Shared.SourcePolicy | null;
-
-    /**
-     * Header param: Optional header to specify the beta version(s) to enable.
-     */
-    betas?: Array<TaskRunAPI.ParallelBeta>;
-  }
-}
-
 declare module './resources/index' {
   export * from './resources/shared';
   export { Beta } from './resources/beta/beta';
@@ -2609,19 +2566,12 @@ declare module './resources/index' {
 }
 
 declare module './client' {
-  import type { HeadersLike } from './internal/headers';
   import type { MergedRequestInit } from './internal/types';
-  import type { APIPromise } from './core/api-promise';
-  import type * as API from './resources/index';
-  import { Beta } from './resources/beta/beta';
-
-  export type Logger = {
-    error: (message: string, ...rest: unknown[]) => void;
-    warn: (message: string, ...rest: unknown[]) => void;
-    info: (message: string, ...rest: unknown[]) => void;
-    debug: (message: string, ...rest: unknown[]) => void;
-  };
-  export type LogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug';
+  import type { Fetch } from './internal/builtin-types';
+  import type { HeadersLike } from './internal/headers';
+  import type { LogLevel, Logger } from './internal/utils/log';
+  import { APIPromise } from './core/api-promise';
+  import * as API from './resources/index';
 
   export interface ClientOptions {
     /**
@@ -2658,7 +2608,7 @@ declare module './client' {
      *
      * If not provided, we expect that `fetch` is defined globally.
      */
-    fetch?: ((input: any, init?: any) => Promise<any>) | undefined;
+    fetch?: Fetch | undefined;
 
     /**
      * The maximum number of times that the client will retry a request in case of a
@@ -2704,7 +2654,6 @@ declare module './client' {
    */
   export class Parallel {
     apiKey: string;
-
     baseURL: string;
     maxRetries: number;
     timeout: number;
@@ -2737,43 +2686,35 @@ declare module './client' {
     put<Rsp>(path: string, opts?: any): APIPromise<Rsp>;
     delete<Rsp>(path: string, opts?: any): APIPromise<Rsp>;
 
-    request<Rsp>(options: any, remainingRetries?: number | null): APIPromise<Rsp>;
-
     taskRun: API.TaskRun;
     beta: API.Beta;
 
-    static Beta: typeof Beta;
-    static DEFAULT_TIMEOUT: number;
-
-    // Error classes and helpers are also exposed as statics at runtime (per source),
-    // but are already exported at top-level via ./core/error.
+    static DEFAULT_TIMEOUT: 60000;
   }
 
   export declare namespace Parallel {
-    export type RequestOptions = import('./internal/request-options').RequestOptions;
-
-    export {
-      type TaskRun,
-      type AutoSchema,
-      type Citation,
-      type FieldBasis,
-      type JsonSchema,
-      type RunInput,
-      type TaskRunJsonOutput,
-      type TaskRunResult,
-      type TaskRunTextOutput,
-      type TaskSpec,
-      type TextSchema,
-      type TaskRunCreateParams,
-      type TaskRunResultParams,
-    } from './resources/task-run';
-
-    export { Beta as Beta };
-
     export type ErrorObject = API.ErrorObject;
     export type ErrorResponse = API.ErrorResponse;
     export type SourcePolicy = API.SourcePolicy;
     export type Warning = API.Warning;
+
+    export type RequestOptions = import('./internal/request-options').RequestOptions;
+
+    export type TaskRun = import('./resources/task-run').TaskRun;
+    export type AutoSchema = import('./resources/task-run').AutoSchema;
+    export type Citation = import('./resources/task-run').Citation;
+    export type FieldBasis = import('./resources/task-run').FieldBasis;
+    export type JsonSchema = import('./resources/task-run').JsonSchema;
+    export type RunInput = import('./resources/task-run').RunInput;
+    export type TaskRunJsonOutput = import('./resources/task-run').TaskRunJsonOutput;
+    export type TaskRunResult = import('./resources/task-run').TaskRunResult;
+    export type TaskRunTextOutput = import('./resources/task-run').TaskRunTextOutput;
+    export type TaskSpec = import('./resources/task-run').TaskSpec;
+    export type TextSchema = import('./resources/task-run').TextSchema;
+    export type TaskRunCreateParams = import('./resources/task-run').TaskRunCreateParams;
+    export type TaskRunResultParams = import('./resources/task-run').TaskRunResultParams;
+
+    export { Beta } from './resources/beta/beta';
   }
 }
 ```
