@@ -1,14 +1,19 @@
 ```ts
 // parallel-sdk-footprint.d.ts
-// Summarized public TypeScript declaration footprint for the SDK.
-// Doc-comments are copied over 1:1 where present in the provided source.
+// Summarized public API surface for the provided SDK sources.
+//
+// Notes:
+// - Doc-comments are copied 1:1 where present on exported public symbols.
+// - Internal modules are intentionally not represented.
+// - Resource/model doc-comments that are absent in source remain absent here.
 
-declare module 'parallel-sdk' {
-  export { Parallel as default } from './client';
+declare module 'parallel' {
+  export { Parallel as default } from 'parallel/client';
 
-  export { type Uploadable, toFile } from './core/uploads';
-  export { APIPromise } from './core/api-promise';
-  export { Parallel, type ClientOptions } from './client';
+  export { type Uploadable, toFile } from 'parallel/core/uploads';
+  export { APIPromise } from 'parallel/core/api-promise';
+  export { Parallel, type ClientOptions } from 'parallel/client';
+
   export {
     ParallelError,
     APIError,
@@ -23,17 +28,22 @@ declare module 'parallel-sdk' {
     InternalServerError,
     PermissionDeniedError,
     UnprocessableEntityError,
-  } from './core/error';
+  } from 'parallel/core/error';
 
-  export * from './resources/index';
+  export * from 'parallel/resources';
 }
 
-declare module './version' {
+declare module 'parallel/version' {
   export const VERSION: '0.3.1';
 }
 
-declare module './core/resource' {
-  import type { Parallel } from './client';
+declare module 'parallel/core/uploads' {
+  export { type Uploadable } from 'parallel/internal/uploads';
+  export { toFile, type ToFileInput } from 'parallel/internal/to-file';
+}
+
+declare module 'parallel/core/resource' {
+  import type { Parallel } from 'parallel/client';
 
   export abstract class APIResource {
     protected _client: Parallel;
@@ -41,20 +51,36 @@ declare module './core/resource' {
   }
 }
 
-declare module './core/uploads' {
-  export { type Uploadable } from './internal/uploads';
-  export { toFile, type ToFileInput } from './internal/to-file';
-}
-
-declare module './core/api-promise' {
-  import { type Parallel } from './client';
+declare module 'parallel/core/api-promise' {
+  import type { Parallel } from 'parallel/client';
 
   /**
    * A subclass of `Promise` providing additional helper methods
    * for interacting with the SDK.
    */
   export class APIPromise<T> extends Promise<T> {
-    constructor(client: Parallel, responsePromise: Promise<any>, parseResponse?: any);
+    constructor(
+      client: Parallel,
+      responsePromise: Promise<{
+        response: Response;
+        options: import('parallel/internal/request-options').FinalRequestOptions;
+        controller: AbortController;
+        requestLogID: string;
+        retryOfRequestLogID: string | undefined;
+        startTime: number;
+      }>,
+      parseResponse?: (
+        client: Parallel,
+        props: {
+          response: Response;
+          options: import('parallel/internal/request-options').FinalRequestOptions;
+          controller: AbortController;
+          requestLogID: string;
+          retryOfRequestLogID: string | undefined;
+          startTime: number;
+        },
+      ) => import('parallel/internal/types').PromiseOrValue<T>,
+    );
 
     /**
      * Gets the raw `Response` instance instead of parsing the response
@@ -83,7 +109,7 @@ declare module './core/api-promise' {
   }
 }
 
-declare module './core/error' {
+declare module 'parallel/core/error' {
   export class ParallelError extends Error {}
 
   export class APIError<
@@ -113,7 +139,7 @@ declare module './core/error' {
   }
 
   export class APIConnectionError extends APIError<undefined, undefined, undefined> {
-    constructor({ message, cause }: { message?: string | undefined; cause?: Error | undefined });
+    constructor({ message, cause }?: { message?: string | undefined; cause?: Error | undefined });
   }
 
   export class APIConnectionTimeoutError extends APIConnectionError {
@@ -130,10 +156,10 @@ declare module './core/error' {
   export class InternalServerError extends APIError<number, Headers> {}
 }
 
-declare module './core/streaming' {
-  /**
-   * NOTE: Stream items are expected to be JSON values when created from SSE or newline streams.
-   */
+declare module 'parallel/core/streaming' {
+  import type { ReadableStream } from 'parallel/internal/shim-types';
+  import type { Parallel } from 'parallel/client';
+
   export type ServerSentEvent = {
     event: string | null;
     data: string;
@@ -143,15 +169,19 @@ declare module './core/streaming' {
   export class Stream<Item> implements AsyncIterable<Item> {
     controller: AbortController;
 
-    constructor(iterator: () => AsyncIterator<Item>, controller: AbortController, client?: any);
+    constructor(iterator: () => AsyncIterator<Item>, controller: AbortController, client?: Parallel);
 
-    static fromSSEResponse<Item>(response: Response, controller: AbortController, client?: any): Stream<Item>;
+    static fromSSEResponse<Item>(response: Response, controller: AbortController, client?: Parallel): Stream<Item>;
 
     /**
      * Generates a Stream from a newline-separated ReadableStream
      * where each item is a JSON value.
      */
-    static fromReadableStream<Item>(readableStream: ReadableStream, controller: AbortController, client?: any): Stream<Item>;
+    static fromReadableStream<Item>(
+      readableStream: ReadableStream,
+      controller: AbortController,
+      client?: Parallel,
+    ): Stream<Item>;
 
     [Symbol.asyncIterator](): AsyncIterator<Item>;
 
@@ -170,7 +200,219 @@ declare module './core/streaming' {
   }
 }
 
-declare module './resources/shared' {
+declare module 'parallel/internal/request-options' {
+  import type { HTTPMethod, MergedRequestInit } from 'parallel/internal/types';
+  import type { HeadersLike } from 'parallel/internal/headers';
+  import type { BodyInit } from 'parallel/internal/builtin-types';
+  import { Stream } from 'parallel/core/streaming';
+
+  export type FinalRequestOptions = RequestOptions & { method: HTTPMethod; path: string };
+
+  export type RequestOptions = {
+    /**
+     * The HTTP method for the request (e.g., 'get', 'post', 'put', 'delete').
+     */
+    method?: HTTPMethod;
+
+    /**
+     * The URL path for the request.
+     *
+     * @example "/v1/foo"
+     */
+    path?: string;
+
+    /**
+     * Query parameters to include in the request URL.
+     */
+    query?: object | undefined | null;
+
+    /**
+     * The request body. Can be a string, JSON object, FormData, or other supported types.
+     */
+    body?: unknown;
+
+    /**
+     * HTTP headers to include with the request. Can be a Headers object, plain object, or array of tuples.
+     */
+    headers?: HeadersLike;
+
+    /**
+     * The maximum number of times that the client will retry a request in case of a
+     * temporary failure, like a network error or a 5XX error from the server.
+     *
+     * @default 2
+     */
+    maxRetries?: number;
+
+    stream?: boolean | undefined;
+
+    /**
+     * The maximum amount of time (in milliseconds) that the client should wait for a response
+     * from the server before timing out a single request.
+     *
+     * @unit milliseconds
+     */
+    timeout?: number;
+
+    /**
+     * Additional `RequestInit` options to be passed to the underlying `fetch` call.
+     * These options will be merged with the client's default fetch options.
+     */
+    fetchOptions?: MergedRequestInit;
+
+    /**
+     * An AbortSignal that can be used to cancel the request.
+     */
+    signal?: AbortSignal | undefined | null;
+
+    /**
+     * A unique key for this request to enable idempotency.
+     */
+    idempotencyKey?: string;
+
+    /**
+     * Override the default base URL for this specific request.
+     */
+    defaultBaseURL?: string | undefined;
+
+    __binaryResponse?: boolean | undefined;
+    __streamClass?: typeof Stream;
+  };
+
+  export type EncodedContent = { bodyHeaders: HeadersLike; body: BodyInit };
+  export type RequestEncoder = (request: { headers: import('parallel/internal/headers').NullableHeaders; body: unknown }) => EncodedContent;
+}
+
+declare module 'parallel/internal/headers' {
+  type HeaderValue = string | undefined | null;
+
+  export type HeadersLike =
+    | Headers
+    | readonly HeaderValue[][]
+    | Record<string, HeaderValue | readonly HeaderValue[]>
+    | undefined
+    | null
+    | NullableHeaders;
+
+  export type NullableHeaders = {
+    /** Parsed headers. */
+    values: Headers;
+    /** Set of lowercase header names explicitly set to null. */
+    nulls: Set<string>;
+  };
+
+  export const buildHeaders: (newHeaders: HeadersLike[]) => NullableHeaders;
+  export const isEmptyHeaders: (headers: HeadersLike) => boolean;
+}
+
+declare module 'parallel/internal/types' {
+  export type PromiseOrValue<T> = T | Promise<T>;
+  export type HTTPMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
+
+  export type KeysEnum<T> = { [P in keyof Required<T>]: true };
+  export type FinalizedRequestInit = RequestInit & { headers: Headers };
+
+  export type MergedRequestInit = any;
+}
+
+declare module 'parallel/internal/builtin-types' {
+  export type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
+  export type BodyInit = RequestInit['body'];
+  export type RequestInfo = Request | URL | string;
+  export type RequestInit = globalThis.RequestInit;
+  export type Response = globalThis.Response;
+  export type HeadersInit = RequestInit['headers'];
+
+  export interface BlobPropertyBag {
+    endings?: 'native' | 'transparent';
+    type?: string;
+  }
+
+  export interface FilePropertyBag extends BlobPropertyBag {
+    lastModified?: number;
+  }
+}
+
+declare module 'parallel/internal/shim-types' {
+  export type ReadableStream<R = any> = globalThis.ReadableStream<R>;
+}
+
+declare module 'parallel/internal/uploads' {
+  /**
+   * Typically, this is a native "File" class.
+   *
+   * We provide the {@link toFile} utility to convert a variety of objects
+   * into the File class.
+   *
+   * For convenience, you can also pass a fetch Response, or in Node,
+   * the result of fs.createReadStream().
+   */
+  export type Uploadable = File | Response | (AsyncIterable<Uint8Array> & { path: string | { toString(): string } }) | (Blob & { readonly name?: string | undefined });
+
+  export type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob | DataView;
+}
+
+declare module 'parallel/internal/to-file' {
+  import type { FilePropertyBag } from 'parallel/internal/builtin-types';
+
+  export interface ResponseLike {
+    url: string;
+    blob(): Promise<{
+      readonly size: number;
+      readonly type: string;
+      text(): Promise<string>;
+      slice(start?: number, end?: number): any;
+    }>;
+  }
+
+  export type ToFileInput =
+    | (Blob & { readonly name?: string | undefined; readonly lastModified?: number })
+    | ResponseLike
+    | Exclude<string | ArrayBuffer | ArrayBufferView | Blob | DataView, string>
+    | AsyncIterable<string | ArrayBuffer | ArrayBufferView | Blob | DataView>;
+
+  /**
+   * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
+   * @param value the raw content of the file. Can be an {@link Uploadable}, BlobLikePart, or AsyncIterable of BlobLikeParts
+   * @param {string=} name the name of the file. If omitted, toFile will try to determine a file name from bits if possible
+   * @param {Object=} options additional properties
+   * @param {string=} options.type the MIME type of the content
+   * @param {number=} options.lastModified the last modified timestamp
+   * @returns a {@link File} with the given properties
+   */
+  export function toFile(
+    value: ToFileInput | PromiseLike<ToFileInput>,
+    name?: string | null | undefined,
+    options?: FilePropertyBag | undefined,
+  ): Promise<File>;
+}
+
+declare module 'parallel/resources' {
+  export * from 'parallel/resources/index';
+}
+
+declare module 'parallel/resources/index' {
+  export * from 'parallel/resources/shared';
+  export { Beta } from 'parallel/resources/beta/beta';
+  export {
+    TaskRun,
+    type AutoSchema,
+    type Citation,
+    type FieldBasis,
+    type JsonSchema,
+    type RunInput,
+    type TaskRunJsonOutput,
+    type TaskRunResult,
+    type TaskRunTextOutput,
+    type TaskSpec,
+    type TextSchema,
+    type TaskRunCreateParams,
+    type TaskRunResultParams,
+  } from 'parallel/resources/task-run';
+}
+
+declare module 'parallel/resources/shared' {
   /**
    * An error message.
    */
@@ -258,11 +500,11 @@ declare module './resources/shared' {
   }
 }
 
-declare module './resources/task-run' {
-  import type * as Shared from './shared';
-  import { APIResource } from './core/resource';
-  import { APIPromise } from './core/api-promise';
-  import type { RequestOptions } from './internal/request-options';
+declare module 'parallel/resources/task-run' {
+  import type * as Shared from 'parallel/resources/shared';
+  import { APIResource } from 'parallel/core/resource';
+  import { APIPromise } from 'parallel/core/api-promise';
+  import type { RequestOptions } from 'parallel/internal/request-options';
 
   export class TaskRun extends APIResource {
     /**
@@ -626,63 +868,37 @@ declare module './resources/task-run' {
   }
 }
 
-declare module './resources/beta/beta' {
-  import type * as Shared from './resources/shared';
-  import { APIResource } from './core/resource';
-  import { APIPromise } from './core/api-promise';
-  import type { RequestOptions } from './internal/request-options';
+declare module 'parallel/resources/beta/beta' {
+  import { APIResource } from 'parallel/core/resource';
+  import { APIPromise } from 'parallel/core/api-promise';
+  import type { RequestOptions } from 'parallel/internal/request-options';
+  import type * as Shared from 'parallel/resources/shared';
 
-  import type {
-    FindAll as FindAllResource,
-    FindAllCancelParams,
-    FindAllCancelResponse,
-    FindAllCandidateMatchStatusEvent,
-    FindAllCreateParams,
-    FindAllEnrichInput,
-    FindAllEnrichParams,
-    FindAllEventsParams,
-    FindAllEventsResponse,
-    FindAllExtendInput,
-    FindAllExtendParams,
-    FindAllIngestParams,
-    FindAllResultParams,
-    FindAllRetrieveParams,
-    FindAllRun,
-    FindAllRunInput,
-    FindAllRunResult,
-    FindAllRunStatusEvent,
-    FindAllSchema,
-    FindAllSchemaParams,
-    FindAllSchemaUpdatedEvent,
-    IngestInput,
-  } from './resources/beta/findall';
+  import * as FindAllAPI from 'parallel/resources/beta/findall';
+  import * as TaskGroupAPI from 'parallel/resources/beta/task-group';
+  import * as TaskRunAPI from 'parallel/resources/beta/task-run';
 
-  import type {
-    TaskGroup as TaskGroupResource,
-    TaskGroupAddRunsParams,
-    TaskGroupCreateParams,
-    TaskGroupEventsParams,
-    TaskGroupEventsResponse,
-    TaskGroupGetRunsParams,
-    TaskGroupGetRunsResponse,
-    TaskGroupRunResponse,
-    TaskGroupStatus,
-  } from './resources/beta/task-group';
+  export class Beta extends APIResource {
+    taskRun: TaskRunAPI.TaskRun;
+    taskGroup: TaskGroupAPI.TaskGroup;
+    findall: FindAllAPI.FindAll;
 
-  import type {
-    TaskRun as BetaTaskRunResource,
-    BetaRunInput,
-    BetaTaskRunResult,
-    ErrorEvent,
-    McpServer,
-    McpToolCall,
-    ParallelBeta,
-    TaskRunEvent,
-    TaskRunEventsResponse,
-    TaskRunCreateParams,
-    TaskRunResultParams,
-    Webhook,
-  } from './resources/beta/task-run';
+    /**
+     * Extracts relevant content from specific web URLs.
+     *
+     * To access this endpoint, pass the `parallel-beta` header with the value
+     * `search-extract-2025-10-10`.
+     */
+    extract(params: BetaExtractParams, options?: RequestOptions): APIPromise<ExtractResponse>;
+
+    /**
+     * Searches the web.
+     *
+     * To access this endpoint, pass the `parallel-beta` header with the value
+     * `search-extract-2025-10-10`.
+     */
+    search(params: BetaSearchParams, options?: RequestOptions): APIPromise<SearchResult>;
+  }
 
   /**
    * Optional settings for returning relevant excerpts.
@@ -912,7 +1128,7 @@ declare module './resources/beta/beta' {
     /**
      * Header param: Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
+    betas?: Array<import('parallel/resources/beta/task-run').ParallelBeta>;
   }
 
   export namespace BetaExtractParams {
@@ -988,103 +1204,17 @@ declare module './resources/beta/beta' {
     /**
      * Header param: Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<ParallelBeta>;
-  }
-
-  export class Beta extends APIResource {
-    taskRun: BetaTaskRunResource;
-    taskGroup: TaskGroupResource;
-    findall: FindAllResource;
-
-    /**
-     * Extracts relevant content from specific web URLs.
-     *
-     * To access this endpoint, pass the `parallel-beta` header with the value
-     * `search-extract-2025-10-10`.
-     */
-    extract(params: BetaExtractParams, options?: RequestOptions): APIPromise<ExtractResponse>;
-
-    /**
-     * Searches the web.
-     *
-     * To access this endpoint, pass the `parallel-beta` header with the value
-     * `search-extract-2025-10-10`.
-     */
-    search(params: BetaSearchParams, options?: RequestOptions): APIPromise<SearchResult>;
-  }
-
-  export namespace Beta {
-    export {
-      // Beta top-level types
-      ExcerptSettings,
-      ExtractError,
-      ExtractResponse,
-      ExtractResult,
-      FetchPolicy,
-      SearchResult,
-      UsageItem,
-      WebSearchResult,
-      BetaExtractParams,
-      BetaSearchParams,
-
-      // Beta.TaskRun subresource + types
-      BetaRunInput,
-      BetaTaskRunResult,
-      ErrorEvent,
-      McpServer,
-      McpToolCall,
-      ParallelBeta,
-      TaskRunEvent,
-      Webhook,
-      TaskRunEventsResponse,
-      TaskRunCreateParams,
-      TaskRunResultParams,
-
-      // Beta.TaskGroup subresource + types
-      TaskGroup,
-      TaskGroupRunResponse,
-      TaskGroupStatus,
-      TaskGroupEventsResponse,
-      TaskGroupGetRunsResponse,
-      TaskGroupCreateParams,
-      TaskGroupAddRunsParams,
-      TaskGroupEventsParams,
-      TaskGroupGetRunsParams,
-
-      // Beta.FindAll subresource + types
-      FindAll,
-      FindAllCandidateMatchStatusEvent,
-      FindAllEnrichInput,
-      FindAllExtendInput,
-      FindAllRun,
-      FindAllRunInput,
-      FindAllRunResult,
-      FindAllRunStatusEvent,
-      FindAllSchema,
-      FindAllSchemaUpdatedEvent,
-      IngestInput,
-      FindAllCancelResponse,
-      FindAllEventsResponse,
-      FindAllCreateParams,
-      FindAllRetrieveParams,
-      FindAllCancelParams,
-      FindAllEnrichParams,
-      FindAllEventsParams,
-      FindAllExtendParams,
-      FindAllIngestParams,
-      FindAllResultParams,
-      FindAllSchemaParams,
-    };
+    betas?: Array<import('parallel/resources/beta/task-run').ParallelBeta>;
   }
 }
 
-declare module './resources/beta/task-run' {
-  import type * as Shared from './resources/shared';
-  import type * as TaskRunAPI from './resources/task-run';
-  import { APIResource } from './core/resource';
-  import { APIPromise } from './core/api-promise';
-  import { Stream } from './core/streaming';
-  import type { RequestOptions } from './internal/request-options';
+declare module 'parallel/resources/beta/task-run' {
+  import { APIResource } from 'parallel/core/resource';
+  import { APIPromise } from 'parallel/core/api-promise';
+  import { Stream } from 'parallel/core/streaming';
+  import type { RequestOptions } from 'parallel/internal/request-options';
+  import type * as Shared from 'parallel/resources/shared';
+  import type * as TaskRunAPI from 'parallel/resources/task-run';
 
   export class TaskRun extends APIResource {
     /**
@@ -1560,13 +1690,13 @@ declare module './resources/beta/task-run' {
   }
 }
 
-declare module './resources/beta/task-group' {
-  import { APIResource } from './core/resource';
-  import { APIPromise } from './core/api-promise';
-  import { Stream } from './core/streaming';
-  import type { RequestOptions } from './internal/request-options';
-  import type * as TaskRunAPI from './resources/task-run';
-  import type * as BetaTaskRunAPI from './resources/beta/task-run';
+declare module 'parallel/resources/beta/task-group' {
+  import { APIResource } from 'parallel/core/resource';
+  import { APIPromise } from 'parallel/core/api-promise';
+  import { Stream } from 'parallel/core/streaming';
+  import type { RequestOptions } from 'parallel/internal/request-options';
+  import type * as BetaTaskRunAPI from 'parallel/resources/beta/task-run';
+  import type * as TaskRunAPI from 'parallel/resources/task-run';
 
   export class TaskGroup extends APIResource {
     /**
@@ -1767,17 +1897,25 @@ declare module './resources/beta/task-group' {
     include_input?: boolean;
     include_output?: boolean;
     last_event_id?: string | null;
-    status?: 'queued' | 'action_required' | 'running' | 'completed' | 'failed' | 'cancelling' | 'cancelled' | null;
+    status?:
+      | 'queued'
+      | 'action_required'
+      | 'running'
+      | 'completed'
+      | 'failed'
+      | 'cancelling'
+      | 'cancelled'
+      | null;
   }
 }
 
-declare module './resources/beta/findall' {
-  import { APIResource } from './core/resource';
-  import { APIPromise } from './core/api-promise';
-  import { Stream } from './core/streaming';
-  import type { RequestOptions } from './internal/request-options';
-  import type * as TaskRunAPI from './resources/task-run';
-  import type * as BetaTaskRunAPI from './resources/beta/task-run';
+declare module 'parallel/resources/beta/findall' {
+  import { APIResource } from 'parallel/core/resource';
+  import { APIPromise } from 'parallel/core/api-promise';
+  import { Stream } from 'parallel/core/streaming';
+  import type { RequestOptions } from 'parallel/internal/request-options';
+  import type * as TaskRunAPI from 'parallel/resources/task-run';
+  import type * as BetaTaskRunAPI from 'parallel/resources/beta/task-run';
 
   export class FindAll extends APIResource {
     /**
@@ -1847,9 +1985,6 @@ declare module './resources/beta/findall' {
     schema(findallID: string, params?: FindAllSchemaParams | null | undefined, options?: RequestOptions): APIPromise<FindAllSchema>;
   }
 
-  /**
-   * Event containing a candidate whose match status has changed.
-   */
   export interface FindAllCandidateMatchStatusEvent {
     /**
      * The candidate whose match status has been updated.
@@ -1880,50 +2015,17 @@ declare module './resources/beta/findall' {
   }
 
   export namespace FindAllCandidateMatchStatusEvent {
-    /**
-     * The candidate whose match status has been updated.
-     */
     export interface Data {
-      /**
-       * ID of the candidate.
-       */
       candidate_id: string;
-
-      /**
-       * Status of the candidate. One of generated, matched, unmatched, discarded.
-       */
       match_status: 'generated' | 'matched' | 'unmatched' | 'discarded';
-
-      /**
-       * Name of the candidate.
-       */
       name: string;
-
       url: string;
-
-      /**
-       * List of FieldBasis objects supporting the output.
-       */
       basis?: Array<TaskRunAPI.FieldBasis> | null;
-
-      /**
-       * Brief description of the entity that can help answer whether entity satisfies
-       * the query.
-       */
       description?: string | null;
-
-      /**
-       * Results of the match condition evaluations for this candidate. This object
-       * contains the structured output that determines whether the candidate matches the
-       * overall FindAll objective.
-       */
       output?: { [key: string]: unknown } | null;
     }
   }
 
-  /**
-   * Input model for FindAll enrich.
-   */
   export interface FindAllEnrichInput {
     /**
      * JSON schema for the enrichment output schema for the FindAll run.
@@ -1941,9 +2043,6 @@ declare module './resources/beta/findall' {
     processor?: string;
   }
 
-  /**
-   * Input model for FindAll extend.
-   */
   export interface FindAllExtendInput {
     /**
      * Additional number of matches to find for this FindAll run. This value will be
@@ -1953,46 +2052,16 @@ declare module './resources/beta/findall' {
     additional_match_limit: number;
   }
 
-  /**
-   * FindAll run object with status and metadata.
-   */
   export interface FindAllRun {
-    /**
-     * ID of the FindAll run.
-     */
     findall_id: string;
-
-    /**
-     * Generator for the FindAll run.
-     */
     generator: 'base' | 'core' | 'pro' | 'preview';
-
-    /**
-     * Status object for the FindAll run.
-     */
     status: FindAllRun.Status;
-
-    /**
-     * Timestamp of the creation of the run, in RFC 3339 format.
-     */
     created_at?: string | null;
-
-    /**
-     * Metadata for the FindAll run.
-     */
     metadata?: { [key: string]: string | number | boolean } | null;
-
-    /**
-     * Timestamp of the latest modification to the FindAll run result, in RFC 3339
-     * format.
-     */
     modified_at?: string | null;
   }
 
   export namespace FindAllRun {
-    /**
-     * Status object for the FindAll run.
-     */
     export interface Status {
       /**
        * Whether the FindAll run is active
@@ -2023,283 +2092,84 @@ declare module './resources/beta/findall' {
     }
 
     export namespace Status {
-      /**
-       * Candidate metrics for the FindAll run.
-       */
       export interface Metrics {
-        /**
-         * Number of candidates that were selected.
-         */
         generated_candidates_count?: number;
-
-        /**
-         * Number of candidates that evaluated to matched.
-         */
         matched_candidates_count?: number;
       }
     }
   }
 
-  /**
-   * Input model for FindAll run.
-   */
   export interface FindAllRunInput {
-    /**
-     * Type of the entity for the FindAll run.
-     */
     entity_type: string;
-
-    /**
-     * Generator for the FindAll run. One of base, core, pro, preview.
-     */
     generator: 'base' | 'core' | 'pro' | 'preview';
-
-    /**
-     * List of match conditions for the FindAll run.
-     */
     match_conditions: Array<FindAllRunInput.MatchCondition>;
-
-    /**
-     * Maximum number of matches to find for this FindAll run. Must be between 5 and
-     * 1000 (inclusive).
-     */
     match_limit: number;
-
-    /**
-     * Natural language objective of the FindAll run.
-     */
     objective: string;
-
-    /**
-     * List of entity names/IDs to exclude from results.
-     */
     exclude_list?: Array<FindAllRunInput.ExcludeList> | null;
-
-    /**
-     * Metadata for the FindAll run.
-     */
     metadata?: { [key: string]: string | number | boolean } | null;
-
-    /**
-     * Webhooks for Task Runs.
-     */
     webhook?: BetaTaskRunAPI.Webhook | null;
   }
 
   export namespace FindAllRunInput {
-    /**
-     * Match condition model for FindAll ingest.
-     */
     export interface MatchCondition {
-      /**
-       * Detailed description of the match condition. Include as much specific
-       * information as possible to help improve the quality and accuracy of Find All run
-       * results.
-       */
       description: string;
-
-      /**
-       * Name of the match condition.
-       */
       name: string;
     }
 
-    /**
-     * Exclude candidate input model for FindAll run.
-     */
     export interface ExcludeList {
-      /**
-       * Name of the entity to exclude from results.
-       */
       name: string;
-
-      /**
-       * URL of the entity to exclude from results.
-       */
       url: string;
     }
   }
 
-  /**
-   * Complete FindAll search results.
-   *
-   * Represents a snapshot of a FindAll run, including run metadata and a list of
-   * candidate entities with their match status and details at the time the snapshot
-   * was taken.
-   */
   export interface FindAllRunResult {
-    /**
-     * All evaluated candidates at the time of the snapshot.
-     */
     candidates: Array<FindAllRunResult.Candidate>;
-
-    /**
-     * FindAll run object.
-     */
     run: FindAllRun;
-
-    /**
-     * ID of the last event of the run at the time of the request. This can be used to
-     * resume streaming from the last event.
-     */
     last_event_id?: string | null;
   }
 
   export namespace FindAllRunResult {
-    /**
-     * Candidate for a find all run that may end up as a match.
-     *
-     * Contains all the candidate's metadata and the output of the match conditions. A
-     * candidate is a match if all match conditions are satisfied.
-     */
     export interface Candidate {
-      /**
-       * ID of the candidate.
-       */
       candidate_id: string;
-
-      /**
-       * Status of the candidate. One of generated, matched, unmatched, discarded.
-       */
       match_status: 'generated' | 'matched' | 'unmatched' | 'discarded';
-
-      /**
-       * Name of the candidate.
-       */
       name: string;
-
-      /**
-       * URL that provides context or details of the entity for disambiguation.
-       */
       url: string;
-
-      /**
-       * List of FieldBasis objects supporting the output.
-       */
       basis?: Array<TaskRunAPI.FieldBasis> | null;
-
-      /**
-       * Brief description of the entity that can help answer whether entity satisfies
-       * the query.
-       */
       description?: string | null;
-
-      /**
-       * Results of the match condition evaluations for this candidate. This object
-       * contains the structured output that determines whether the candidate matches the
-       * overall FindAll objective.
-       */
       output?: { [key: string]: unknown } | null;
     }
   }
 
-  /**
-   * Event containing status update for FindAll run.
-   */
   export interface FindAllRunStatusEvent {
-    /**
-     * Updated FindAll run information.
-     */
     data: FindAllRun;
-
-    /**
-     * Unique event identifier for the event.
-     */
     event_id: string;
-
-    /**
-     * Timestamp of the event.
-     */
     timestamp: string;
-
-    /**
-     * Event type; always 'findall.status'.
-     */
     type: 'findall.status';
   }
 
-  /**
-   * Response model for FindAll ingest.
-   */
   export interface FindAllSchema {
-    /**
-     * Type of the entity for the FindAll run.
-     */
     entity_type: string;
-
-    /**
-     * List of match conditions for the FindAll run.
-     */
     match_conditions: Array<FindAllSchema.MatchCondition>;
-
-    /**
-     * Natural language objective of the FindAll run.
-     */
     objective: string;
-
-    /**
-     * List of enrichment inputs for the FindAll run.
-     */
     enrichments?: Array<FindAllEnrichInput> | null;
-
-    /**
-     * The generator of the FindAll run.
-     */
     generator?: 'base' | 'core' | 'pro' | 'preview';
-
-    /**
-     * Max number of candidates to evaluate
-     */
     match_limit?: number | null;
   }
 
   export namespace FindAllSchema {
-    /**
-     * Match condition model for FindAll ingest.
-     */
     export interface MatchCondition {
-      /**
-       * Detailed description of the match condition. Include as much specific
-       * information as possible to help improve the quality and accuracy of Find All run
-       * results.
-       */
       description: string;
-
-      /**
-       * Name of the match condition.
-       */
       name: string;
     }
   }
 
-  /**
-   * Event containing full snapshot of FindAll run state.
-   */
   export interface FindAllSchemaUpdatedEvent {
-    /**
-     * Updated FindAll schema.
-     */
     data: FindAllSchema;
-
-    /**
-     * Unique event identifier for the event.
-     */
     event_id: string;
-
-    /**
-     * Timestamp of the event.
-     */
     timestamp: string;
-
-    /**
-     * Event type; always 'findall.schema.updated'.
-     */
     type: 'findall.schema.updated';
   }
 
-  /**
-   * Input model for FindAll ingest.
-   */
   export interface IngestInput {
     /**
      * Natural language objective to create a FindAll run spec.
@@ -2309,9 +2179,6 @@ declare module './resources/beta/findall' {
 
   export type FindAllCancelResponse = unknown;
 
-  /**
-   * Event containing full snapshot of FindAll run state.
-   */
   export type FindAllEventsResponse =
     | FindAllSchemaUpdatedEvent
     | FindAllRunStatusEvent
@@ -2319,177 +2186,57 @@ declare module './resources/beta/findall' {
     | BetaTaskRunAPI.ErrorEvent;
 
   export interface FindAllCreateParams {
-    /**
-     * Body param: Type of the entity for the FindAll run.
-     */
     entity_type: string;
-
-    /**
-     * Body param: Generator for the FindAll run. One of base, core, pro, preview.
-     */
     generator: 'base' | 'core' | 'pro' | 'preview';
-
-    /**
-     * Body param: List of match conditions for the FindAll run.
-     */
     match_conditions: Array<FindAllCreateParams.MatchCondition>;
-
-    /**
-     * Body param: Maximum number of matches to find for this FindAll run. Must be
-     * between 5 and 1000 (inclusive).
-     */
     match_limit: number;
-
-    /**
-     * Body param: Natural language objective of the FindAll run.
-     */
     objective: string;
-
-    /**
-     * Body param: List of entity names/IDs to exclude from results.
-     */
     exclude_list?: Array<FindAllCreateParams.ExcludeList> | null;
-
-    /**
-     * Body param: Metadata for the FindAll run.
-     */
     metadata?: { [key: string]: string | number | boolean } | null;
-
-    /**
-     * Body param: Webhooks for Task Runs.
-     */
     webhook?: BetaTaskRunAPI.Webhook | null;
-
-    /**
-     * Header param: Optional header to specify the beta version(s) to enable.
-     */
     betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
   export namespace FindAllCreateParams {
-    /**
-     * Match condition model for FindAll ingest.
-     */
     export interface MatchCondition {
-      /**
-       * Detailed description of the match condition. Include as much specific
-       * information as possible to help improve the quality and accuracy of Find All run
-       * results.
-       */
       description: string;
-
-      /**
-       * Name of the match condition.
-       */
       name: string;
     }
-
-    /**
-     * Exclude candidate input model for FindAll run.
-     */
     export interface ExcludeList {
-      /**
-       * Name of the entity to exclude from results.
-       */
       name: string;
-
-      /**
-       * URL of the entity to exclude from results.
-       */
       url: string;
     }
   }
 
   export interface FindAllRetrieveParams {
-    /**
-     * Optional header to specify the beta version(s) to enable.
-     */
     betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
-
   export interface FindAllCancelParams {
-    /**
-     * Optional header to specify the beta version(s) to enable.
-     */
     betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
-
   export interface FindAllEnrichParams {
-    /**
-     * Body param: JSON schema for the enrichment output schema for the FindAll run.
-     */
     output_schema: TaskRunAPI.JsonSchema;
-
-    /**
-     * Body param: List of MCP servers to use for the task.
-     */
     mcp_servers?: Array<BetaTaskRunAPI.McpServer> | null;
-
-    /**
-     * Body param: Processor to use for the task.
-     */
     processor?: string;
-
-    /**
-     * Header param: Optional header to specify the beta version(s) to enable.
-     */
     betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
-
   export interface FindAllEventsParams {
-    /**
-     * Query param
-     */
     last_event_id?: string | null;
-
-    /**
-     * Query param
-     */
     timeout?: number | null;
-
-    /**
-     * Header param: Optional header to specify the beta version(s) to enable.
-     */
     betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
-
   export interface FindAllExtendParams {
-    /**
-     * Body param: Additional number of matches to find for this FindAll run. This
-     * value will be added to the current match limit to determine the new total match
-     * limit. Must be greater than 0.
-     */
     additional_match_limit: number;
-
-    /**
-     * Header param: Optional header to specify the beta version(s) to enable.
-     */
     betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
-
   export interface FindAllIngestParams {
-    /**
-     * Body param: Natural language objective to create a FindAll run spec.
-     */
     objective: string;
-
-    /**
-     * Header param: Optional header to specify the beta version(s) to enable.
-     */
     betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
-
   export interface FindAllResultParams {
-    /**
-     * Optional header to specify the beta version(s) to enable.
-     */
     betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
-
   export interface FindAllSchemaParams {
-    /**
-     * Optional header to specify the beta version(s) to enable.
-     */
     betas?: Array<BetaTaskRunAPI.ParallelBeta>;
   }
 
@@ -2545,33 +2292,14 @@ declare module './resources/beta/findall' {
   export type FindallSchemaParams = FindAllSchemaParams;
 }
 
-declare module './resources/index' {
-  export * from './resources/shared';
-  export { Beta } from './resources/beta/beta';
-  export {
-    TaskRun,
-    type AutoSchema,
-    type Citation,
-    type FieldBasis,
-    type JsonSchema,
-    type RunInput,
-    type TaskRunJsonOutput,
-    type TaskRunResult,
-    type TaskRunTextOutput,
-    type TaskSpec,
-    type TextSchema,
-    type TaskRunCreateParams,
-    type TaskRunResultParams,
-  } from './resources/task-run';
-}
+declare module 'parallel/client' {
+  import type { Fetch } from 'parallel/internal/builtin-types';
+  import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestInit } from 'parallel/internal/types';
+  import type { HeadersLike } from 'parallel/internal/headers';
+  import type { FinalRequestOptions, RequestOptions } from 'parallel/internal/request-options';
+  import { APIPromise } from 'parallel/core/api-promise';
 
-declare module './client' {
-  import type { MergedRequestInit } from './internal/types';
-  import type { Fetch } from './internal/builtin-types';
-  import type { HeadersLike } from './internal/headers';
-  import type { LogLevel, Logger } from './internal/utils/log';
-  import { APIPromise } from './core/api-promise';
-  import * as API from './resources/index';
+  export type { Logger, LogLevel } from 'parallel/internal/utils/log';
 
   export interface ClientOptions {
     /**
@@ -2639,14 +2367,14 @@ declare module './client' {
      *
      * Defaults to process.env['PARALLEL_LOG'] or 'warn' if it isn't set.
      */
-    logLevel?: LogLevel | undefined;
+    logLevel?: import('parallel/internal/utils/log').LogLevel | undefined;
 
     /**
      * Set the logger.
      *
      * Defaults to globalThis.console.
      */
-    logger?: Logger | undefined;
+    logger?: import('parallel/internal/utils/log').Logger | undefined;
   }
 
   /**
@@ -2657,8 +2385,10 @@ declare module './client' {
     baseURL: string;
     maxRetries: number;
     timeout: number;
-    logger: Logger;
-    logLevel: LogLevel | undefined;
+
+    logger: import('parallel/internal/utils/log').Logger;
+    logLevel: import('parallel/internal/utils/log').LogLevel | undefined;
+
     fetchOptions: MergedRequestInit | undefined;
 
     /**
@@ -2680,41 +2410,89 @@ declare module './client' {
      */
     withOptions(options: Partial<ClientOptions>): this;
 
-    get<Rsp>(path: string, opts?: any): APIPromise<Rsp>;
-    post<Rsp>(path: string, opts?: any): APIPromise<Rsp>;
-    patch<Rsp>(path: string, opts?: any): APIPromise<Rsp>;
-    put<Rsp>(path: string, opts?: any): APIPromise<Rsp>;
-    delete<Rsp>(path: string, opts?: any): APIPromise<Rsp>;
+    get<Rsp>(path: string, opts?: PromiseOrValue<RequestOptions>): APIPromise<Rsp>;
+    post<Rsp>(path: string, opts?: PromiseOrValue<RequestOptions>): APIPromise<Rsp>;
+    patch<Rsp>(path: string, opts?: PromiseOrValue<RequestOptions>): APIPromise<Rsp>;
+    put<Rsp>(path: string, opts?: PromiseOrValue<RequestOptions>): APIPromise<Rsp>;
+    delete<Rsp>(path: string, opts?: PromiseOrValue<RequestOptions>): APIPromise<Rsp>;
 
-    taskRun: API.TaskRun;
-    beta: API.Beta;
+    request<Rsp>(options: PromiseOrValue<FinalRequestOptions>, remainingRetries?: number | null): APIPromise<Rsp>;
 
-    static DEFAULT_TIMEOUT: 60000;
+    fetchWithTimeout(
+      url: import('parallel/internal/builtin-types').RequestInfo,
+      init: import('parallel/internal/builtin-types').RequestInit | undefined,
+      ms: number,
+      controller: AbortController,
+    ): Promise<Response>;
+
+    buildURL(path: string, query: Record<string, unknown> | null | undefined, defaultBaseURL?: string | undefined): string;
+
+    buildRequest(
+      inputOptions: FinalRequestOptions,
+      ctx?: { retryCount?: number },
+    ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }>;
+
+    static Parallel: typeof Parallel;
+    static DEFAULT_TIMEOUT: number;
+
+    static ParallelError: typeof import('parallel/core/error').ParallelError;
+    static APIError: typeof import('parallel/core/error').APIError;
+    static APIConnectionError: typeof import('parallel/core/error').APIConnectionError;
+    static APIConnectionTimeoutError: typeof import('parallel/core/error').APIConnectionTimeoutError;
+    static APIUserAbortError: typeof import('parallel/core/error').APIUserAbortError;
+    static NotFoundError: typeof import('parallel/core/error').NotFoundError;
+    static ConflictError: typeof import('parallel/core/error').ConflictError;
+    static RateLimitError: typeof import('parallel/core/error').RateLimitError;
+    static BadRequestError: typeof import('parallel/core/error').BadRequestError;
+    static AuthenticationError: typeof import('parallel/core/error').AuthenticationError;
+    static InternalServerError: typeof import('parallel/core/error').InternalServerError;
+    static PermissionDeniedError: typeof import('parallel/core/error').PermissionDeniedError;
+    static UnprocessableEntityError: typeof import('parallel/core/error').UnprocessableEntityError;
+
+    static toFile: typeof import('parallel/internal/to-file').toFile;
+
+    taskRun: import('parallel/resources/task-run').TaskRun;
+    beta: import('parallel/resources/beta/beta').Beta;
   }
 
   export declare namespace Parallel {
-    export type ErrorObject = API.ErrorObject;
-    export type ErrorResponse = API.ErrorResponse;
-    export type SourcePolicy = API.SourcePolicy;
-    export type Warning = API.Warning;
+    export type RequestOptions = import('parallel/internal/request-options').RequestOptions;
 
-    export type RequestOptions = import('./internal/request-options').RequestOptions;
+    export {
+      type TaskRun as TaskRun,
+      type AutoSchema as AutoSchema,
+      type Citation as Citation,
+      type FieldBasis as FieldBasis,
+      type JsonSchema as JsonSchema,
+      type RunInput as RunInput,
+      type TaskRunJsonOutput as TaskRunJsonOutput,
+      type TaskRunResult as TaskRunResult,
+      type TaskRunTextOutput as TaskRunTextOutput,
+      type TaskSpec as TaskSpec,
+      type TextSchema as TextSchema,
+      type TaskRunCreateParams as TaskRunCreateParams,
+      type TaskRunResultParams as TaskRunResultParams,
+    } from 'parallel/resources/task-run';
 
-    export type TaskRun = import('./resources/task-run').TaskRun;
-    export type AutoSchema = import('./resources/task-run').AutoSchema;
-    export type Citation = import('./resources/task-run').Citation;
-    export type FieldBasis = import('./resources/task-run').FieldBasis;
-    export type JsonSchema = import('./resources/task-run').JsonSchema;
-    export type RunInput = import('./resources/task-run').RunInput;
-    export type TaskRunJsonOutput = import('./resources/task-run').TaskRunJsonOutput;
-    export type TaskRunResult = import('./resources/task-run').TaskRunResult;
-    export type TaskRunTextOutput = import('./resources/task-run').TaskRunTextOutput;
-    export type TaskSpec = import('./resources/task-run').TaskSpec;
-    export type TextSchema = import('./resources/task-run').TextSchema;
-    export type TaskRunCreateParams = import('./resources/task-run').TaskRunCreateParams;
-    export type TaskRunResultParams = import('./resources/task-run').TaskRunResultParams;
+    export { Beta as Beta } from 'parallel/resources/beta/beta';
 
-    export { Beta } from './resources/beta/beta';
+    export type ErrorObject = import('parallel/resources/shared').ErrorObject;
+    export type ErrorResponse = import('parallel/resources/shared').ErrorResponse;
+    export type SourcePolicy = import('parallel/resources/shared').SourcePolicy;
+    export type Warning = import('parallel/resources/shared').Warning;
   }
+}
+
+declare module 'parallel/internal/utils/log' {
+  export type LogFn = (message: string, ...rest: unknown[]) => void;
+
+  export type Logger = {
+    error: LogFn;
+    warn: LogFn;
+    info: LogFn;
+    debug: LogFn;
+  };
+
+  export type LogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug';
 }
 ```
