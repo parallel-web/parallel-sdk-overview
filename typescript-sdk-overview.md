@@ -1,16 +1,20 @@
-```ts
-// parallel-sdk-footprint.d.ts
-// Summarized public API footprint for the Parallel TypeScript SDK.
-// Doc-comments are copied 1:1 from the source where available.
+Below is a single **ambient** `parallel-sdk.d.ts` file that summarizes the public footprint of the SDK shown in your tree. It’s intentionally “LLM-friendly”: one file, exports in one place, and includes doc-comments copied **verbatim** from the provided sources (when present). Internal-only modules are omitted.
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+> Notes / limitations:
+> - This is a *summary declaration* of the public API surface inferred from the files you pasted. It won’t include anything not present in that snapshot.
+> - Where the SDK’s runtime depends on DOM types (`fetch`, `Response`, `Headers`, `FormData`, `File`, `ReadableStream`), this `.d.ts` assumes those are available in the TypeScript compilation environment (or are provided via libs/polyfills).
+
+```ts
+// parallel-sdk.d.ts
+// Single-file footprint summary for the Parallel TypeScript SDK (as provided).
 
 declare module 'parallel' {
-  export { Parallel as default } from './client';
+  export { Parallel as default } from 'parallel/client';
 
-  export { type Uploadable, toFile } from './core/uploads';
-  export { APIPromise } from './core/api-promise';
-  export { Parallel, type ClientOptions } from './client';
+  export { type Uploadable, toFile, type ToFileInput } from 'parallel/core/uploads';
+  export { APIPromise } from 'parallel/core/api-promise';
+  export { Parallel, type ClientOptions } from 'parallel/client';
+
   export {
     ParallelError,
     APIError,
@@ -25,58 +29,16 @@ declare module 'parallel' {
     InternalServerError,
     PermissionDeniedError,
     UnprocessableEntityError,
-  } from './core/error';
+  } from 'parallel/core/error';
+
+  export * from 'parallel/resources';
 }
 
-declare module './version' {
+declare module 'parallel/version' {
   export const VERSION: '0.3.1';
 }
 
-declare module './core/resource' {
-  import type { Parallel } from './client';
-
-  export abstract class APIResource {
-    protected _client: Parallel;
-    constructor(client: Parallel);
-  }
-}
-
-declare module './core/api-promise' {
-  import { type Parallel } from './client';
-
-  /**
-   * A subclass of `Promise` providing additional helper methods
-   * for interacting with the SDK.
-   */
-  export class APIPromise<T> extends Promise<T> {
-    /**
-     * Gets the raw `Response` instance instead of parsing the response
-     * data.
-     *
-     * If you want to parse the response body but still get the `Response`
-     * instance, you can use {@link withResponse()}.
-     *
-     * 👋 Getting the wrong TypeScript type for `Response`?
-     * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
-     * to your `tsconfig.json`.
-     */
-    asResponse(): Promise<Response>;
-
-    /**
-     * Gets the parsed response data and the raw `Response` instance.
-     *
-     * If you just want to get the raw `Response` instance without parsing it,
-     * you can use {@link asResponse()}.
-     *
-     * 👋 Getting the wrong TypeScript type for `Response`?
-     * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
-     * to your `tsconfig.json`.
-     */
-    withResponse(): Promise<{ data: T; response: Response }>;
-  }
-}
-
-declare module './core/error' {
+declare module 'parallel/core/error' {
   export class ParallelError extends Error {}
 
   export class APIError<
@@ -106,7 +68,7 @@ declare module './core/error' {
   }
 
   export class APIConnectionError extends APIError<undefined, undefined, undefined> {
-    constructor({ message, cause }: { message?: string | undefined; cause?: Error | undefined });
+    constructor({ message, cause }?: { message?: string | undefined; cause?: Error | undefined });
   }
 
   export class APIConnectionTimeoutError extends APIConnectionError {
@@ -123,41 +85,78 @@ declare module './core/error' {
   export class InternalServerError extends APIError<number, Headers> {}
 }
 
-declare module './core/uploads' {
-  export type Uploadable = File | Response | (AsyncIterable<Uint8Array> & { path: string | { toString(): string } }) | (Blob & { readonly name?: string | undefined });
-
-  export type ToFileInput =
-    | (Blob & {
-        readonly size: number;
-        readonly type: string;
-        text(): Promise<string>;
-        slice(start?: number, end?: number): any;
-        readonly lastModified?: number;
-        readonly name?: string | undefined;
-        arrayBuffer(): Promise<ArrayBuffer>;
-      })
-    | { url: string; blob(): Promise<any> }
-    | Exclude<string | ArrayBuffer | ArrayBufferView | Blob | DataView, string>
-    | AsyncIterable<string | ArrayBuffer | ArrayBufferView | Blob | DataView>;
+declare module 'parallel/core/api-promise' {
+  import { type Parallel } from 'parallel/client';
 
   /**
-   * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
-   * @param value the raw content of the file. Can be an {@link Uploadable}, BlobLikePart, or AsyncIterable of BlobLikeParts
-   * @param {string=} name the name of the file. If omitted, toFile will try to determine a file name from bits if possible
-   * @param {Object=} options additional properties
-   * @param {string=} options.type the MIME type of the content
-   * @param {number=} options.lastModified the last modified timestamp
-   * @returns a {@link File} with the given properties
+   * A subclass of `Promise` providing additional helper methods
+   * for interacting with the SDK.
    */
-  export function toFile(
-    value: ToFileInput | PromiseLike<ToFileInput>,
-    name?: string | null | undefined,
-    options?: { endings?: 'native' | 'transparent'; type?: string; lastModified?: number } | undefined,
-  ): Promise<File>;
+  export class APIPromise<T> extends Promise<T> {
+    constructor(
+      client: Parallel,
+      responsePromise: Promise<{
+        response: Response;
+        options: import('parallel/internal/request-options').FinalRequestOptions;
+        controller: AbortController;
+        requestLogID: string;
+        retryOfRequestLogID: string | undefined;
+        startTime: number;
+      }>,
+      parseResponse?: (
+        client: Parallel,
+        props: {
+          response: Response;
+          options: import('parallel/internal/request-options').FinalRequestOptions;
+          controller: AbortController;
+          requestLogID: string;
+          retryOfRequestLogID: string | undefined;
+          startTime: number;
+        },
+      ) => T | Promise<T>,
+    );
+
+    /**
+     * Gets the raw `Response` instance instead of parsing the response
+     * data.
+     *
+     * If you want to parse the response body but still get the `Response`
+     * instance, you can use {@link withResponse()}.
+     *
+     * 👋 Getting the wrong TypeScript type for `Response`?
+     * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
+     * to your `tsconfig.json`.
+     */
+    asResponse(): Promise<Response>;
+
+    /**
+     * Gets the parsed response data and the raw `Response` instance.
+     *
+     * If you just want to get the raw `Response` instance without parsing it,
+     * you can use {@link asResponse()}.
+     *
+     * 👋 Getting the wrong TypeScript type for `Response`?
+     * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
+     * to your `tsconfig.json`.
+     */
+    withResponse(): Promise<{ data: T; response: Response }>;
+
+    _thenUnwrap<U>(transform: (data: T, props: any) => U): APIPromise<U>;
+  }
 }
 
-declare module './core/streaming' {
-  import type { Parallel } from './client';
+declare module 'parallel/core/resource' {
+  import type { Parallel } from 'parallel/client';
+
+  export abstract class APIResource {
+    protected _client: Parallel;
+    constructor(client: Parallel);
+  }
+}
+
+declare module 'parallel/core/streaming' {
+  import type { Parallel } from 'parallel/client';
+  import { ParallelError } from 'parallel/core/error';
 
   export type ServerSentEvent = {
     event: string | null;
@@ -170,13 +169,21 @@ declare module './core/streaming' {
 
     constructor(iterator: () => AsyncIterator<Item>, controller: AbortController, client?: Parallel);
 
-    static fromSSEResponse<Item>(response: Response, controller: AbortController, client?: Parallel): Stream<Item>;
+    static fromSSEResponse<Item>(
+      response: Response,
+      controller: AbortController,
+      client?: Parallel,
+    ): Stream<Item>;
 
     /**
      * Generates a Stream from a newline-separated ReadableStream
      * where each item is a JSON value.
      */
-    static fromReadableStream<Item>(readableStream: ReadableStream, controller: AbortController, client?: Parallel): Stream<Item>;
+    static fromReadableStream<Item>(
+      readableStream: ReadableStream,
+      controller: AbortController,
+      client?: Parallel,
+    ): Stream<Item>;
 
     [Symbol.asyncIterator](): AsyncIterator<Item>;
 
@@ -193,9 +200,88 @@ declare module './core/streaming' {
      */
     toReadableStream(): ReadableStream;
   }
+
+  export function _iterSSEMessages(
+    response: Response,
+    controller: AbortController,
+  ): AsyncGenerator<ServerSentEvent, void, unknown>;
+
+  export { ParallelError };
 }
 
-declare module './resources/shared' {
+declare module 'parallel/core/uploads' {
+  export { type Uploadable } from 'parallel/internal/uploads';
+  export { toFile, type ToFileInput } from 'parallel/internal/to-file';
+}
+
+declare module 'parallel/internal/uploads' {
+  /**
+   * Typically, this is a native "File" class.
+   *
+   * We provide the {@link toFile} utility to convert a variety of objects
+   * into the File class.
+   *
+   * For convenience, you can also pass a fetch Response, or in Node,
+   * the result of fs.createReadStream().
+   */
+  export type Uploadable = File | Response | (AsyncIterable<Uint8Array> & { path: string | { toString(): string } }) | (Blob & { readonly name?: string | undefined });
+}
+
+declare module 'parallel/internal/to-file' {
+  export interface ResponseLike {
+    url: string;
+    blob(): Promise<{ readonly size: number; readonly type: string; text(): Promise<string>; slice(start?: number, end?: number): any }>;
+  }
+
+  export type ToFileInput =
+    | (Blob & { readonly name?: string | undefined; readonly lastModified?: number })
+    | ResponseLike
+    | Exclude<string | ArrayBuffer | ArrayBufferView | Blob | DataView, string>
+    | AsyncIterable<string | ArrayBuffer | ArrayBufferView | Blob | DataView>;
+
+  /**
+   * Helper for creating a {@link File} to pass to an SDK upload method from a variety of different data formats
+   * @param value the raw content of the file. Can be an {@link Uploadable}, BlobLikePart, or AsyncIterable of BlobLikeParts
+   * @param {string=} name the name of the file. If omitted, toFile will try to determine a file name from bits if possible
+   * @param {Object=} options additional properties
+   * @param {string=} options.type the MIME type of the content
+   * @param {number=} options.lastModified the last modified timestamp
+   * @returns a {@link File} with the given properties
+   */
+  export function toFile(
+    value: ToFileInput | PromiseLike<ToFileInput>,
+    name?: string | null | undefined,
+    options?: { type?: string; lastModified?: number } | undefined,
+  ): Promise<File>;
+}
+
+declare module 'parallel/resources' {
+  export * from 'parallel/resources/index';
+}
+
+declare module 'parallel/resources/index' {
+  export * from 'parallel/resources/shared';
+
+  export { Beta } from 'parallel/resources/beta/beta';
+
+  export {
+    TaskRun,
+    type AutoSchema,
+    type Citation,
+    type FieldBasis,
+    type JsonSchema,
+    type RunInput,
+    type TaskRunJsonOutput,
+    type TaskRunResult,
+    type TaskRunTextOutput,
+    type TaskSpec,
+    type TextSchema,
+    type TaskRunCreateParams,
+    type TaskRunResultParams,
+  } from 'parallel/resources/task-run';
+}
+
+declare module 'parallel/resources/shared' {
   /**
    * An error message.
    */
@@ -283,11 +369,11 @@ declare module './resources/shared' {
   }
 }
 
-declare module './resources/task-run' {
-  import { APIResource } from './core/resource';
-  import { APIPromise } from './core/api-promise';
-  import { type RequestOptions } from './client';
-  import * as Shared from './resources/shared';
+declare module 'parallel/resources/task-run' {
+  import { APIResource } from 'parallel/core/resource';
+  import { APIPromise } from 'parallel/core/api-promise';
+  import { type RequestOptions } from 'parallel/internal/request-options';
+  import * as Shared from 'parallel/resources/shared';
 
   export class TaskRun extends APIResource {
     /**
@@ -309,7 +395,11 @@ declare module './resources/task-run' {
     /**
      * Retrieves a run result by run_id, blocking until the run is completed.
      */
-    result(runID: string, query?: TaskRunResultParams | null | undefined, options?: RequestOptions): APIPromise<TaskRunResult>;
+    result(
+      runID: string,
+      query?: TaskRunResultParams | null | undefined,
+      options?: RequestOptions,
+    ): APIPromise<TaskRunResult>;
   }
 
   /**
@@ -651,18 +741,22 @@ declare module './resources/task-run' {
   }
 }
 
-declare module './resources/beta/beta' {
-  import { APIResource } from './core/resource';
-  import { APIPromise } from './core/api-promise';
-  import { type RequestOptions } from './client';
-  import * as Shared from './resources/shared';
-  import { Stream } from './core/streaming';
-  import * as TaskRunAPI from './resources/task-run';
+declare module 'parallel/resources/beta/beta' {
+  import { APIResource } from 'parallel/core/resource';
+  import { APIPromise } from 'parallel/core/api-promise';
+  import { type RequestOptions } from 'parallel/internal/request-options';
+
+  import { TaskRun as BetaTaskRunResource } from 'parallel/resources/beta/task-run';
+  import { TaskGroup as TaskGroupResource } from 'parallel/resources/beta/task-group';
+  import { FindAll as FindAllResource } from 'parallel/resources/beta/findall';
+
+  import * as Shared from 'parallel/resources/shared';
+  import type { ParallelBeta } from 'parallel/resources/beta/task-run';
 
   export class Beta extends APIResource {
-    taskRun: import('./resources/beta/task-run').TaskRun;
-    taskGroup: import('./resources/beta/task-group').TaskGroup;
-    findall: import('./resources/beta/findall').FindAll;
+    taskRun: BetaTaskRunResource;
+    taskGroup: TaskGroupResource;
+    findall: FindAllResource;
 
     /**
      * Extracts relevant content from specific web URLs.
@@ -909,7 +1003,7 @@ declare module './resources/beta/beta' {
     /**
      * Header param: Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<TaskRunAPI.ParallelBeta>;
+    betas?: Array<ParallelBeta>;
   }
 
   export namespace BetaExtractParams {
@@ -985,17 +1079,17 @@ declare module './resources/beta/beta' {
     /**
      * Header param: Optional header to specify the beta version(s) to enable.
      */
-    betas?: Array<TaskRunAPI.ParallelBeta>;
+    betas?: Array<ParallelBeta>;
   }
 }
 
-declare module './resources/beta/task-run' {
-  import { APIResource } from './core/resource';
-  import { APIPromise } from './core/api-promise';
-  import { Stream } from './core/streaming';
-  import { type RequestOptions } from './client';
-  import * as Shared from './resources/shared';
-  import * as TaskRunAPI from './resources/task-run';
+declare module 'parallel/resources/beta/task-run' {
+  import { APIResource } from 'parallel/core/resource';
+  import { APIPromise } from 'parallel/core/api-promise';
+  import { Stream } from 'parallel/core/streaming';
+  import { type RequestOptions } from 'parallel/internal/request-options';
+  import * as Shared from 'parallel/resources/shared';
+  import * as TaskRunAPI from 'parallel/resources/task-run';
 
   export class TaskRun extends APIResource {
     /**
@@ -1021,7 +1115,11 @@ declare module './resources/beta/task-run' {
     /**
      * Retrieves a run result by run_id, blocking until the run is completed.
      */
-    result(runID: string, params?: TaskRunResultParams | null | undefined, options?: RequestOptions): APIPromise<BetaTaskRunResult>;
+    result(
+      runID: string,
+      params?: TaskRunResultParams | null | undefined,
+      options?: RequestOptions,
+    ): APIPromise<BetaTaskRunResult>;
   }
 
   /**
@@ -1471,13 +1569,13 @@ declare module './resources/beta/task-run' {
   }
 }
 
-declare module './resources/beta/task-group' {
-  import { APIResource } from './core/resource';
-  import { APIPromise } from './core/api-promise';
-  import { Stream } from './core/streaming';
-  import { type RequestOptions } from './client';
-  import * as TaskRunAPI from './resources/task-run';
-  import * as BetaTaskRunAPI from './resources/beta/task-run';
+declare module 'parallel/resources/beta/task-group' {
+  import { APIResource } from 'parallel/core/resource';
+  import { APIPromise } from 'parallel/core/api-promise';
+  import { Stream } from 'parallel/core/streaming';
+  import { type RequestOptions } from 'parallel/internal/request-options';
+  import * as TaskRunAPI from 'parallel/resources/task-run';
+  import * as BetaTaskRunAPI from 'parallel/resources/beta/task-run';
 
   export class TaskGroup extends APIResource {
     /**
@@ -1493,7 +1591,11 @@ declare module './resources/beta/task-group' {
     /**
      * Initiates multiple task runs within a TaskGroup.
      */
-    addRuns(taskGroupID: string, params: TaskGroupAddRunsParams, options?: RequestOptions): APIPromise<TaskGroupRunResponse>;
+    addRuns(
+      taskGroupID: string,
+      params: TaskGroupAddRunsParams,
+      options?: RequestOptions,
+    ): APIPromise<TaskGroupRunResponse>;
 
     /**
      * Streams events from a TaskGroup: status updates and run completions.
@@ -1501,7 +1603,11 @@ declare module './resources/beta/task-group' {
      * The connection will remain open for up to an hour as long as at least one run in
      * the group is still active.
      */
-    events(taskGroupID: string, query?: TaskGroupEventsParams | undefined, options?: RequestOptions): APIPromise<Stream<TaskGroupEventsResponse>>;
+    events(
+      taskGroupID: string,
+      query?: TaskGroupEventsParams | undefined,
+      options?: RequestOptions,
+    ): APIPromise<Stream<TaskGroupEventsResponse>>;
 
     /**
      * Retrieves task runs in a TaskGroup and optionally their inputs and outputs.
@@ -1515,7 +1621,11 @@ declare module './resources/beta/task-group' {
      * the stream. The stream will resume from the next event after the
      * `last_event_id`.
      */
-    getRuns(taskGroupID: string, query?: TaskGroupGetRunsParams | undefined, options?: RequestOptions): APIPromise<Stream<TaskGroupGetRunsResponse>>;
+    getRuns(
+      taskGroupID: string,
+      query?: TaskGroupGetRunsParams | undefined,
+      options?: RequestOptions,
+    ): APIPromise<Stream<TaskGroupGetRunsResponse>>;
   }
 
   /**
@@ -1678,17 +1788,25 @@ declare module './resources/beta/task-group' {
     include_input?: boolean;
     include_output?: boolean;
     last_event_id?: string | null;
-    status?: 'queued' | 'action_required' | 'running' | 'completed' | 'failed' | 'cancelling' | 'cancelled' | null;
+    status?:
+      | 'queued'
+      | 'action_required'
+      | 'running'
+      | 'completed'
+      | 'failed'
+      | 'cancelling'
+      | 'cancelled'
+      | null;
   }
 }
 
-declare module './resources/beta/findall' {
-  import { APIResource } from './core/resource';
-  import { APIPromise } from './core/api-promise';
-  import { Stream } from './core/streaming';
-  import { type RequestOptions } from './client';
-  import * as TaskRunAPI from './resources/task-run';
-  import * as BetaTaskRunAPI from './resources/beta/task-run';
+declare module 'parallel/resources/beta/findall' {
+  import { APIResource } from 'parallel/core/resource';
+  import { APIPromise } from 'parallel/core/api-promise';
+  import { Stream } from 'parallel/core/streaming';
+  import { type RequestOptions } from 'parallel/internal/request-options';
+  import * as TaskRunAPI from 'parallel/resources/task-run';
+  import * as BetaTaskRunAPI from 'parallel/resources/beta/task-run';
 
   export class FindAll extends APIResource {
     /**
@@ -1710,17 +1828,29 @@ declare module './resources/beta/findall' {
     /**
      * Retrieve a FindAll run.
      */
-    retrieve(findallID: string, params?: FindAllRetrieveParams | null | undefined, options?: RequestOptions): APIPromise<FindAllRun>;
+    retrieve(
+      findallID: string,
+      params?: FindAllRetrieveParams | null | undefined,
+      options?: RequestOptions,
+    ): APIPromise<FindAllRun>;
 
     /**
      * Cancel a FindAll run.
      */
-    cancel(findallID: string, params?: FindAllCancelParams | null | undefined, options?: RequestOptions): APIPromise<unknown>;
+    cancel(
+      findallID: string,
+      params?: FindAllCancelParams | null | undefined,
+      options?: RequestOptions,
+    ): APIPromise<unknown>;
 
     /**
      * Add an enrichment to a FindAll run.
      */
-    enrich(findallID: string, params: FindAllEnrichParams, options?: RequestOptions): APIPromise<FindAllSchema>;
+    enrich(
+      findallID: string,
+      params: FindAllEnrichParams,
+      options?: RequestOptions,
+    ): APIPromise<FindAllSchema>;
 
     /**
      * Stream events from a FindAll run.
@@ -1730,12 +1860,20 @@ declare module './resources/beta/findall' {
      * keep connection alive as long as the run is going. If set, stop after specified
      * duration.
      */
-    events(findallID: string, params?: FindAllEventsParams | undefined, options?: RequestOptions): APIPromise<Stream<FindAllEventsResponse>>;
+    events(
+      findallID: string,
+      params?: FindAllEventsParams | undefined,
+      options?: RequestOptions,
+    ): APIPromise<Stream<FindAllEventsResponse>>;
 
     /**
      * Extend a FindAll run by adding additional matches to the current match limit.
      */
-    extend(findallID: string, params: FindAllExtendParams, options?: RequestOptions): APIPromise<FindAllSchema>;
+    extend(
+      findallID: string,
+      params: FindAllExtendParams,
+      options?: RequestOptions,
+    ): APIPromise<FindAllSchema>;
 
     /**
      * Transforms a natural language search objective into a structured FindAll spec.
@@ -1750,12 +1888,20 @@ declare module './resources/beta/findall' {
     /**
      * Retrieve the FindAll run result at the time of the request.
      */
-    result(findallID: string, params?: FindAllResultParams | null | undefined, options?: RequestOptions): APIPromise<FindAllRunResult>;
+    result(
+      findallID: string,
+      params?: FindAllResultParams | null | undefined,
+      options?: RequestOptions,
+    ): APIPromise<FindAllRunResult>;
 
     /**
      * Get FindAll Run Schema
      */
-    schema(findallID: string, params?: FindAllSchemaParams | null | undefined, options?: RequestOptions): APIPromise<FindAllSchema>;
+    schema(
+      findallID: string,
+      params?: FindAllSchemaParams | null | undefined,
+      options?: RequestOptions,
+    ): APIPromise<FindAllSchema>;
   }
 
   /**
@@ -1810,9 +1956,6 @@ declare module './resources/beta/findall' {
        */
       name: string;
 
-      /**
-       * URL that provides context or details of the entity for disambiguation.
-       */
       url: string;
 
       /**
@@ -2459,17 +2602,98 @@ declare module './resources/beta/findall' {
   export type FindallSchemaParams = FindAllSchemaParams;
 }
 
-declare module './client' {
-  import type { MergedRequestInit } from './internal/types';
-  import type { Fetch } from './internal/builtin-types';
-  import type { HeadersLike } from './internal/headers';
-  import { APIPromise } from './core/api-promise';
-  import * as Errors from './core/error';
-  import * as Uploads from './core/uploads';
-  import * as API from './resources/index';
-  import { Beta } from './resources/beta/beta';
+declare module 'parallel/internal/request-options' {
+  import { Stream } from 'parallel/core/streaming';
 
-  export type { Logger, LogLevel } from './internal/utils/log';
+  export type HTTPMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
+
+  export type FinalRequestOptions = RequestOptions & { method: HTTPMethod; path: string };
+
+  export type HeadersLike =
+    | Headers
+    | readonly (readonly (string | undefined | null)[])[]
+    | Record<string, string | undefined | null | readonly (string | undefined | null)[]>
+    | undefined
+    | null
+    | any;
+
+  export type RequestOptions = {
+    /**
+     * The HTTP method for the request (e.g., 'get', 'post', 'put', 'delete').
+     */
+    method?: HTTPMethod;
+
+    /**
+     * The URL path for the request.
+     *
+     * @example "/v1/foo"
+     */
+    path?: string;
+
+    /**
+     * Query parameters to include in the request URL.
+     */
+    query?: object | undefined | null;
+
+    /**
+     * The request body. Can be a string, JSON object, FormData, or other supported types.
+     */
+    body?: unknown;
+
+    /**
+     * HTTP headers to include with the request. Can be a Headers object, plain object, or array of tuples.
+     */
+    headers?: HeadersLike;
+
+    /**
+     * The maximum number of times that the client will retry a request in case of a
+     * temporary failure, like a network error or a 5XX error from the server.
+     *
+     * @default 2
+     */
+    maxRetries?: number;
+
+    stream?: boolean | undefined;
+
+    /**
+     * The maximum amount of time (in milliseconds) that the client should wait for a response
+     * from the server before timing out a single request.
+     *
+     * @unit milliseconds
+     */
+    timeout?: number;
+
+    /**
+     * Additional `RequestInit` options to be passed to the underlying `fetch` call.
+     * These options will be merged with the client's default fetch options.
+     */
+    fetchOptions?: RequestInit;
+
+    /**
+     * An AbortSignal that can be used to cancel the request.
+     */
+    signal?: AbortSignal | undefined | null;
+
+    /**
+     * A unique key for this request to enable idempotency.
+     */
+    idempotencyKey?: string;
+
+    /**
+     * Override the default base URL for this specific request.
+     */
+    defaultBaseURL?: string | undefined;
+
+    __binaryResponse?: boolean | undefined;
+    __streamClass?: typeof Stream;
+  };
+}
+
+declare module 'parallel/client' {
+  import type { APIPromise } from 'parallel/core/api-promise';
+  import type { Stream } from 'parallel/core/streaming';
+
+  export type { Logger, LogLevel } from 'parallel/internal/utils/log';
 
   export interface ClientOptions {
     /**
@@ -2499,14 +2723,14 @@ declare module './client' {
      * Additional `RequestInit` options to be passed to `fetch` calls.
      * Properties will be overridden by per-request `fetchOptions`.
      */
-    fetchOptions?: MergedRequestInit | undefined;
+    fetchOptions?: RequestInit | undefined;
 
     /**
      * Specify a custom `fetch` function implementation.
      *
      * If not provided, we expect that `fetch` is defined globally.
      */
-    fetch?: Fetch | undefined;
+    fetch?: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
     /**
      * The maximum number of times that the client will retry a request in case of a
@@ -2522,7 +2746,7 @@ declare module './client' {
      * These can be removed in individual requests by explicitly setting the
      * header to `null` in request options.
      */
-    defaultHeaders?: HeadersLike | undefined;
+    defaultHeaders?: any;
 
     /**
      * Default query parameters to include with every request to the API.
@@ -2537,20 +2761,28 @@ declare module './client' {
      *
      * Defaults to process.env['PARALLEL_LOG'] or 'warn' if it isn't set.
      */
-    logLevel?: import('./internal/utils/log').LogLevel | undefined;
+    logLevel?: import('parallel/internal/utils/log').LogLevel | undefined;
 
     /**
      * Set the logger.
      *
      * Defaults to globalThis.console.
      */
-    logger?: import('./internal/utils/log').Logger | undefined;
+    logger?: import('parallel/internal/utils/log').Logger | undefined;
   }
 
   /**
    * API Client for interfacing with the Parallel API.
    */
   export class Parallel {
+    apiKey: string;
+    baseURL: string;
+    maxRetries: number;
+    timeout: number;
+    logger: import('parallel/internal/utils/log').Logger;
+    logLevel: import('parallel/internal/utils/log').LogLevel | undefined;
+    fetchOptions: RequestInit | undefined;
+
     /**
      * API Client for interfacing with the Parallel API.
      *
@@ -2565,144 +2797,92 @@ declare module './client' {
      */
     constructor(opts?: ClientOptions);
 
-    apiKey: string;
-    baseURL: string;
-    maxRetries: number;
-    timeout: number;
-    logger: import('./internal/utils/log').Logger;
-    logLevel: import('./internal/utils/log').LogLevel | undefined;
-    fetchOptions: MergedRequestInit | undefined;
-
     /**
      * Create a new client instance re-using the same options given to the current client with optional overriding.
      */
     withOptions(options: Partial<ClientOptions>): this;
 
-    get<Rsp>(path: string, opts?: import('./internal/types').PromiseOrValue<RequestOptions>): APIPromise<Rsp>;
-    post<Rsp>(path: string, opts?: import('./internal/types').PromiseOrValue<RequestOptions>): APIPromise<Rsp>;
-    patch<Rsp>(path: string, opts?: import('./internal/types').PromiseOrValue<RequestOptions>): APIPromise<Rsp>;
-    put<Rsp>(path: string, opts?: import('./internal/types').PromiseOrValue<RequestOptions>): APIPromise<Rsp>;
-    delete<Rsp>(path: string, opts?: import('./internal/types').PromiseOrValue<RequestOptions>): APIPromise<Rsp>;
+    get<Rsp>(path: string, opts?: import('parallel/internal/types').PromiseOrValue<import('parallel/internal/request-options').RequestOptions>): APIPromise<Rsp>;
+    post<Rsp>(path: string, opts?: import('parallel/internal/types').PromiseOrValue<import('parallel/internal/request-options').RequestOptions>): APIPromise<Rsp>;
+    patch<Rsp>(path: string, opts?: import('parallel/internal/types').PromiseOrValue<import('parallel/internal/request-options').RequestOptions>): APIPromise<Rsp>;
+    put<Rsp>(path: string, opts?: import('parallel/internal/types').PromiseOrValue<import('parallel/internal/request-options').RequestOptions>): APIPromise<Rsp>;
+    delete<Rsp>(path: string, opts?: import('parallel/internal/types').PromiseOrValue<import('parallel/internal/request-options').RequestOptions>): APIPromise<Rsp>;
 
-    taskRun: API.TaskRun;
-    beta: API.Beta;
+    request<Rsp>(
+      options: import('parallel/internal/types').PromiseOrValue<import('parallel/internal/request-options').FinalRequestOptions>,
+      remainingRetries?: number | null,
+    ): APIPromise<Rsp>;
 
     static DEFAULT_TIMEOUT: 60000;
 
-    static ParallelError: typeof Errors.ParallelError;
-    static APIError: typeof Errors.APIError;
-    static APIConnectionError: typeof Errors.APIConnectionError;
-    static APIConnectionTimeoutError: typeof Errors.APIConnectionTimeoutError;
-    static APIUserAbortError: typeof Errors.APIUserAbortError;
-    static NotFoundError: typeof Errors.NotFoundError;
-    static ConflictError: typeof Errors.ConflictError;
-    static RateLimitError: typeof Errors.RateLimitError;
-    static BadRequestError: typeof Errors.BadRequestError;
-    static AuthenticationError: typeof Errors.AuthenticationError;
-    static InternalServerError: typeof Errors.InternalServerError;
-    static PermissionDeniedError: typeof Errors.PermissionDeniedError;
-    static UnprocessableEntityError: typeof Errors.UnprocessableEntityError;
+    static Parallel: typeof Parallel;
 
-    static toFile: typeof Uploads.toFile;
+    static ParallelError: typeof import('parallel/core/error').ParallelError;
+    static APIError: typeof import('parallel/core/error').APIError;
+    static APIConnectionError: typeof import('parallel/core/error').APIConnectionError;
+    static APIConnectionTimeoutError: typeof import('parallel/core/error').APIConnectionTimeoutError;
+    static APIUserAbortError: typeof import('parallel/core/error').APIUserAbortError;
+    static NotFoundError: typeof import('parallel/core/error').NotFoundError;
+    static ConflictError: typeof import('parallel/core/error').ConflictError;
+    static RateLimitError: typeof import('parallel/core/error').RateLimitError;
+    static BadRequestError: typeof import('parallel/core/error').BadRequestError;
+    static AuthenticationError: typeof import('parallel/core/error').AuthenticationError;
+    static InternalServerError: typeof import('parallel/core/error').InternalServerError;
+    static PermissionDeniedError: typeof import('parallel/core/error').PermissionDeniedError;
+    static UnprocessableEntityError: typeof import('parallel/core/error').UnprocessableEntityError;
 
-    static Beta: typeof Beta;
+    static toFile: typeof import('parallel/internal/to-file').toFile;
+
+    // Resources:
+    taskRun: import('parallel/resources/task-run').TaskRun;
+    beta: import('parallel/resources/beta/beta').Beta;
+
+    // Class-level alias
+    static Beta: typeof import('parallel/resources/beta/beta').Beta;
   }
 
-  export type RequestOptions = import('./internal/request-options').RequestOptions;
+  export declare namespace Parallel {
+    export type RequestOptions = import('parallel/internal/request-options').RequestOptions;
+
+    export type TaskRun = import('parallel/resources/task-run').TaskRun;
+    export type AutoSchema = import('parallel/resources/task-run').AutoSchema;
+    export type Citation = import('parallel/resources/task-run').Citation;
+    export type FieldBasis = import('parallel/resources/task-run').FieldBasis;
+    export type JsonSchema = import('parallel/resources/task-run').JsonSchema;
+    export type RunInput = import('parallel/resources/task-run').RunInput;
+    export type TaskRunJsonOutput = import('parallel/resources/task-run').TaskRunJsonOutput;
+    export type TaskRunResult = import('parallel/resources/task-run').TaskRunResult;
+    export type TaskRunTextOutput = import('parallel/resources/task-run').TaskRunTextOutput;
+    export type TaskSpec = import('parallel/resources/task-run').TaskSpec;
+    export type TextSchema = import('parallel/resources/task-run').TextSchema;
+    export type TaskRunCreateParams = import('parallel/resources/task-run').TaskRunCreateParams;
+    export type TaskRunResultParams = import('parallel/resources/task-run').TaskRunResultParams;
+
+    export type Beta = import('parallel/resources/beta/beta').Beta;
+
+    export type ErrorObject = import('parallel/resources/shared').ErrorObject;
+    export type ErrorResponse = import('parallel/resources/shared').ErrorResponse;
+    export type SourcePolicy = import('parallel/resources/shared').SourcePolicy;
+    export type Warning = import('parallel/resources/shared').Warning;
+  }
 }
 
-declare module './internal/request-options' {
-  import type { Stream } from './core/streaming';
+declare module 'parallel/internal/utils/log' {
+  type LogFn = (message: string, ...rest: unknown[]) => void;
 
-  export type RequestOptions = {
-    /**
-     * The HTTP method for the request (e.g., 'get', 'post', 'put', 'delete').
-     */
-    method?: import('./internal/types').HTTPMethod;
-
-    /**
-     * The URL path for the request.
-     *
-     * @example "/v1/foo"
-     */
-    path?: string;
-
-    /**
-     * Query parameters to include in the request URL.
-     */
-    query?: object | undefined | null;
-
-    /**
-     * The request body. Can be a string, JSON object, FormData, or other supported types.
-     */
-    body?: unknown;
-
-    /**
-     * HTTP headers to include with the request. Can be a Headers object, plain object, or array of tuples.
-     */
-    headers?: import('./internal/headers').HeadersLike;
-
-    /**
-     * The maximum number of times that the client will retry a request in case of a
-     * temporary failure, like a network error or a 5XX error from the server.
-     *
-     * @default 2
-     */
-    maxRetries?: number;
-
-    stream?: boolean | undefined;
-
-    /**
-     * The maximum amount of time (in milliseconds) that the client should wait for a response
-     * from the server before timing out a single request.
-     *
-     * @unit milliseconds
-     */
-    timeout?: number;
-
-    /**
-     * Additional `RequestInit` options to be passed to the underlying `fetch` call.
-     * These options will be merged with the client's default fetch options.
-     */
-    fetchOptions?: import('./internal/types').MergedRequestInit;
-
-    /**
-     * An AbortSignal that can be used to cancel the request.
-     */
-    signal?: AbortSignal | undefined | null;
-
-    /**
-     * A unique key for this request to enable idempotency.
-     */
-    idempotencyKey?: string;
-
-    /**
-     * Override the default base URL for this specific request.
-     */
-    defaultBaseURL?: string | undefined;
-
-    __binaryResponse?: boolean | undefined;
-    __streamClass?: typeof Stream;
+  export type Logger = {
+    error: LogFn;
+    warn: LogFn;
+    info: LogFn;
+    debug: LogFn;
   };
+
+  export type LogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug';
 }
 
-declare module './resources/index' {
-  export * from './resources/shared';
-  export { Beta } from './resources/beta/beta';
-  export {
-    TaskRun,
-    type AutoSchema,
-    type Citation,
-    type FieldBasis,
-    type JsonSchema,
-    type RunInput,
-    type TaskRunJsonOutput,
-    type TaskRunResult,
-    type TaskRunTextOutput,
-    type TaskSpec,
-    type TextSchema,
-    type TaskRunCreateParams,
-    type TaskRunResultParams,
-  } from './resources/task-run';
+declare module 'parallel/internal/types' {
+  export type PromiseOrValue<T> = T | Promise<T>;
 }
 ```
+
+If you want, I can also generate a **non-ambient** version (no `declare module` blocks; just `export ...`) tailored to your actual package name/import path (e.g. `'@parallel-ai/sdk'`), but I’d need the real npm package name from `package.json`.
