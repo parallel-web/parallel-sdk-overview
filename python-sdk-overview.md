@@ -1,34 +1,69 @@
-I can do that, but I can’t directly fetch or browse that GitHub URL from here.
+I can do that, but I can’t fetch or browse that GitHub/uithub URL from here. If you paste the package source (or upload a zip / the `.py` files under `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API and copies docstrings 1:1.
 
-If you paste the contents of the package (or upload a zip) I’ll generate a single `parallel.pyi` that merges the public surface area and copies docstrings 1:1.
+In the meantime, here’s exactly what I will produce, and the rules I’ll follow—plus a ready-to-run script you can use locally to generate a draft `.pyi` from that repo and then paste it back here for me to refine.
 
-### What I need from you
-Please provide **either**:
+---
 
-1) A zip/tar of `src/parallel/` (preferred), **or**  
-2) Paste the full text of all `.py` files under `src/parallel/` (including `__init__.py`), **or**  
-3) Paste the output of one of these commands:
+## What I will generate (once I have the code)
+
+- **One file**: `parallel.pyi`
+- **Contains**:
+  - All public modules/classes/functions/constants/types exported by the package footprint
+  - `__all__` respected where present
+  - Re-exports captured (e.g., `from .x import Y as Y`)
+  - `typing` annotations preserved as best as possible (including generics, overloads)
+  - **Doc-comments/docstrings copied 1:1** where available (module, class, method, function docstrings)
+- **Omits** (unless you ask otherwise):
+  - Private names beginning with `_` (except dunder methods and required protocol methods)
+  - Function bodies (as per `.pyi` format)
+
+---
+
+## What I need from you
+
+Either:
+
+1) Upload/paste the contents of `src/parallel/**.py` (multiple files is fine), **or**
+2) Upload a zip of the repository, **or**
+3) Run the script below locally and paste the generated `parallel.pyi` plus any errors.
+
+---
+
+## Local auto-generation script (you run it)
+
+This produces a first-pass stub using `stubgen` (from mypy), then I’ll refine/merge/export rules and docstrings as needed.
 
 ```bash
-# option A: concatenate all python files
-python - <<'PY'
-import pathlib
-root = pathlib.Path("src/parallel")
-for p in sorted(root.rglob("*.py")):
-    print("\n\n# === FILE:", p.as_posix(), "===\n")
-    print(p.read_text(encoding="utf-8"))
-PY
+# 1) Clone repo
+git clone https://github.com/parallel-web/parallel-sdk-python.git
+cd parallel-sdk-python
+
+# 2) Create venv (optional)
+python -m venv .venv
+source .venv/bin/activate  # (Windows: .venv\Scripts\activate)
+
+# 3) Install deps for stubgen
+pip install mypy
+
+# 4) Generate stubs for the package
+stubgen -p parallel -o /tmp/parallel_stubs -m
+
+# 5) View result
+find /tmp/parallel_stubs -type f -maxdepth 5 -print
 ```
 
-Once you provide that, I will return a **single** `.pyi` file that:
-- Includes all modules/classes/functions/constants exported publicly
-- Preserves docstrings exactly (copied 1:1)
-- Uses best-effort type hints (from annotations if present; otherwise inferred conservatively)
-- Flattens/re-exports to make it easy for an LLM to understand the footprint
+That will generate a stub tree (multiple `.pyi` files). Since you asked for a **single** `.pyi`, I will then:
+- inline/merge them into one file,
+- preserve imports/typing,
+- ensure re-exports match runtime behavior,
+- and copy docstrings 1:1 (stubgen often drops docstrings; I’ll re-insert from source).
 
-### Quick question (so I format it correctly)
-Do you want the result as:
-- **(A)** one file named `parallel.pyi` representing the *whole package* (recommended), or
-- **(B)** a stub that mimics the module tree inside one file via `# --- module: parallel.foo ---` sections?
+If you want, you can also generate an AST-based docstring-preserving stub, but it’s more involved; I’ll do that step on my side once you provide the sources.
 
-Reply with the code/zip and your preference (A or B).
+---
+
+## Fastest path
+
+Paste the list of files under `src/parallel/` plus their contents (you can paste file-by-file). If it’s large, upload a zip.
+
+Once I have the code, I’ll return a single `parallel.pyi` in one block, ready to save.
