@@ -1,114 +1,100 @@
-I can, but I can’t fetch or browse that GitHub link from here. If you paste the contents of `src/` (or upload a zip / paste the key `.ts` files), I’ll generate a single consolidated `parallel-sdk.d.ts` that reflects the exported public API surface and will copy doc-comments **1:1**.
+I can, but I can’t directly fetch that GitHub URL from here. If you paste the contents of the `src/` folder (or upload a zip / tarball), I’ll generate a single consolidated `index.d.ts` that represents the full public API surface and I’ll copy doc-comments over **verbatim** (1:1).
 
-In the meantime, here’s exactly what I need + a ready-to-run script you can execute locally to produce the `.d.ts` automatically (and then you can send me the output if you want me to polish/merge/reformat it for LLM readability).
+Meanwhile, here’s exactly what I’ll produce and how, plus a ready-to-run script you can use locally to generate the single `.d.ts` and send it back.
+
+---
 
 ## What I need from you
-Either:
 
-1) Paste:
-- `src/index.ts` (or the main entry file from `package.json`’s `exports`/`main`/`types`)
-- Any re-exported modules it pulls in (often `client.ts`, `types.ts`, etc.)
+One of:
 
-or
+1. **Paste** the repo’s `src/**` files here (or at least all exported entrypoints like `src/index.ts` and any re-exported modules), or  
+2. **Upload** the folder contents, or  
+3. Run the script below locally and paste the generated `parallel-sdk.d.ts` back here.
 
-2) Run the script below and paste/upload the generated `parallel-sdk.d.ts`.
+Once I have the code, I’ll return a **single `.d.ts`** that:
+- includes all exported types/classes/functions,
+- preserves JSDoc comments **exactly** as written,
+- resolves re-exports into one file (so an LLM can see the full footprint at once).
 
 ---
 
-## Option A (best): Generate a single bundled `.d.ts` locally
+## Local one-shot generator (recommended)
+
+This uses TypeScript’s compiler to emit `.d.ts`, then bundles them into one file.
 
 ### 1) Install dependencies
-From the repo root:
-
 ```bash
-npm i
+npm i -D typescript @microsoft/api-extractor
 ```
 
-(Or `pnpm i` / `yarn`.)
-
-### 2) Create `tsconfig.dts.json`
-Create a file `tsconfig.dts.json` in the repo root:
-
-```json
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "declarationMap": false,
-    "stripInternal": false,
-    "outFile": "./dist/parallel-sdk.d.ts",
-    "module": "amd",
-    "target": "ES2020",
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "skipLibCheck": true
-  },
-  "include": ["src/**/*.ts"]
-}
-```
-
-Notes:
-- TypeScript only supports `outFile` bundling for `module: "amd"` or `"system"`. This is a common trick purely for emitting a single `.d.ts`.
-- This preserves JSDoc comments as emitted by TS.
-
-### 3) Run the emit
-```bash
-npx tsc -p tsconfig.dts.json
-```
-
-This will produce:
-- `dist/parallel-sdk.d.ts`
-
-### 4) Send it to me
-Paste the generated `dist/parallel-sdk.d.ts` here, and I can:
-- Ensure it’s clean, deduplicated, and LLM-friendly
-- Optionally reorganize with `declare namespace` / grouping (without changing the doc-comments)
-- Verify the “public footprint” matches intended entrypoints
-
----
-
-## Option B: If `outFile` doesn’t work cleanly (project references / ESM constraints)
-Use Microsoft API Extractor, which is made for this.
-
-```bash
-npm i -D @microsoft/api-extractor
-```
-
-Create `api-extractor.json`:
-
+### 2) Create `api-extractor.json` at repo root
 ```json
 {
   "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
   "mainEntryPointFilePath": "<projectFolder>/dist/types/index.d.ts",
-  "dtsRollup": {
-    "enabled": true,
-    "untrimmedFilePath": "<projectFolder>/dist/parallel-sdk.d.ts"
-  },
+  "projectFolder": ".",
   "compiler": {
     "tsconfigFilePath": "<projectFolder>/tsconfig.json"
   },
+  "dtsRollup": {
+    "enabled": true,
+    "untrimmedFilePath": "<projectFolder>/parallel-sdk.d.ts"
+  },
   "apiReport": { "enabled": false },
-  "docModel": { "enabled": false }
+  "docModel": { "enabled": false },
+  "messages": {
+    "compilerMessageReporting": { "default": { "logLevel": "none" } },
+    "extractorMessageReporting": { "default": { "logLevel": "none" } },
+    "tsdocMessageReporting": { "default": { "logLevel": "none" } }
+  }
 }
 ```
 
-Then:
-1) Ensure your normal build emits declarations to `dist/types` (or adjust path).
-2) Run:
+### 3) Ensure your `tsconfig.json` emits declarations
+If not already set, add (or override) these:
+```json
+{
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "outDir": "dist/types"
+  },
+  "include": ["src"]
+}
+```
+
+### 4) Build declarations + roll them up
 ```bash
+npx tsc -p tsconfig.json
 npx api-extractor run --local
 ```
 
+You’ll get a single file:
+- `parallel-sdk.d.ts`
+
+Paste that file here, and I can further:
+- “normalize” it for LLM readability (optional),
+- ensure the single file includes all necessary `declare namespace`/module shapes,
+- fix any missing re-export issues (if the entrypoint isn’t `src/index.ts`, etc.).
+
 ---
 
-## Once you provide the source or emitted declarations…
-I will produce a **single `.d.ts`** that:
-- Contains only the **public API surface** (what consumers import)
-- Preserves **all doc-comments 1:1**
-- Includes exported types/interfaces/enums/classes/functions, and re-exports resolved
-- Avoids implementation details
+## If you want me to do it manually here
+Send:
+- `src/index.ts` (or package entry file)
+- any `src/**` files it exports from / re-exports
+- `package.json` (to know entrypoints)
+- `tsconfig.json` (to know path aliases)
 
-Send either:
-- the `dist/parallel-sdk.d.ts`, or
-- the `src/` files (especially the entrypoint), and I’ll generate it here.
+Then I’ll produce the consolidated `.d.ts` directly in-chat.
+
+---
+
+## Quick clarification
+When you say “single `.d.ts` file that summarizes the entire footprint of the API”, do you want it to:
+1) reflect the **actual exported public API** (what users can import), or  
+2) include **everything in `src/`**, even internal/non-exported modules?
+
+If you tell me which, I’ll format accordingly.
