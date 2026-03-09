@@ -1,27 +1,34 @@
-I can do this, but I can’t access that URL from here. If you paste the contents of the `src/` tree (or upload a zip / paste key files), I’ll generate a single consolidated `parallel-sdk.d.ts` that summarizes the public API surface and preserves doc-comments 1:1.
+I can, but I can’t fetch that GitHub link directly from here. If you paste the contents of the `src/` directory (or upload a zip / paste key files like `index.ts`, `client.ts`, etc.), I’ll generate a single consolidated `parallel-sdk.d.ts` that:
+
+- flattens/exports the full public API surface (classes, functions, types, interfaces, enums)
+- preserves **all JSDoc/doc-comments 1:1** (copied verbatim)
+- resolves `export * from ...` barrels into one file
+- keeps names/namespaces aligned with the real package entrypoint
 
 ### What I need from you
-Pick one:
+Please provide either:
 
-1. **Upload** a zip of `src/` (best), or  
-2. **Paste** the contents of all `.ts` files in `src/`, or  
-3. Paste the output of:
-   - `tree -a src`
-   - and then `sed -n '1,200p'` (or full contents) for each file, or  
-4. Point me to a **raw GitHub** link *and* confirm I’m allowed to fetch it (in some environments I still won’t be able to).
+1) A zip of the repository (or at least `src/`), **or**  
+2) Paste the contents of:
+- `src/index.ts` (or whatever the package entry is)
+- any barrel files (`src/*/index.ts`)
+- all files that define exported symbols (anything re-exported)
 
-### What I will produce
-A single `.d.ts` file that:
+### Output format
+Once I have the code, I’ll return a single file like:
 
-- Merges all exported types/classes/functions into one file
-- Preserves **all existing doc-comments exactly** (copied 1:1, no edits)
-- Includes re-exported symbols (following `export * from ...`)
-- Uses `declare namespace` / `declare module` only if needed; otherwise plain top-level `export` declarations
-- Omits implementation details, keeps signatures, overloads, generics, and JSDoc
+```ts
+// parallel-sdk.d.ts
+declare module "parallel-sdk" {
+  // ... complete API footprint here ...
+}
+```
 
-### One quick clarification
-Do you want the output shaped as:
-- **(A)** a module file: `export ...` (typical for TS libs), or
-- **(B)** `declare module "parallel-sdk"` { ... } wrapping everything (useful for drop-in typings)
+(or multiple `declare module` blocks if the package exposes subpath exports like `"parallel-sdk/xyz"`).
 
-Tell me **A or B**, and share the `src/` contents, and I’ll generate the single `.d.ts`.
+### If you want, I can also
+- include “private” but reachable types (used in public signatures)
+- normalize imports so the .d.ts is self-contained (no external relative imports)
+- keep the same module specifier name as in `package.json` (`name` field)
+
+Send the `src/` contents and tell me the module name you want in the `declare module "..."` wrapper (or paste `package.json`), and I’ll generate the single `.d.ts`.
