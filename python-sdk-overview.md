@@ -1,46 +1,24 @@
-I can, but I can’t access that URL from here to read the repository contents directly. If you paste (or upload) the `src/parallel/` package contents (or a zip/tarball), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API and copies docstrings 1:1.
+I can do this, but I can’t access that URL directly from here. If you paste the repository contents (or upload a zip / tarball of `src/parallel`) I’ll generate a single consolidated `parallel.pyi` that mirrors the public API and includes docstrings copied 1:1.
 
-In the meantime, here are two options:
+### What I need from you
+Pick one:
 
-## Option A (best): You provide the source
-Please upload or paste:
-- all `.py` files under `src/parallel/` (and any `py.typed` / `__init__.py` files)
-- optionally `pyproject.toml` / `setup.cfg` if it affects exports
+1. **Upload files**: Upload a zip of the `src/parallel/` directory (or the whole repo).
+2. **Paste file tree + contents**: Paste:
+   - the directory listing of `src/parallel`
+   - the full contents of each `.py` file under it
+3. **Give me raw file links**: Provide direct *raw* GitHub links for each file (not `uithub.com` pages), e.g. `https://raw.githubusercontent.com/.../path/to/file.py`.
 
-Then I will return one `.pyi` file containing:
-- all exported symbols (modules, classes, functions, constants)
-- signatures (incl. keyword-only args, defaults when expressible)
-- type aliases, TypedDicts, Enums, Protocols, dataclasses
-- docstrings copied 1:1 (verbatim) placed on the corresponding stub elements
+### What I will produce
+- A **single** `parallel.pyi` that:
+  - includes all public classes, functions, constants, and modules re-exported via `__init__.py`
+  - preserves **docstrings exactly 1:1** (module/class/function docstrings), placed in the stub in the appropriate locations
+  - uses best-effort type signatures (from annotations in code; if missing, uses `Any`)
+  - includes overloads where present and preserves default values when representable in stubs
+  - keeps the import surface minimal and resolves cross-module references
 
-## Option B: You run a script to extract + I generate
-Run this locally in the repo root and paste me the output (or upload the generated bundle):
+### Quick questions (so the stub matches your intent)
+1. Should the stub reflect **only the public API** (what a user imports from `parallel`) or **everything under `src/parallel`**, including internal modules?
+2. Target Python version for typing features: **3.9+** or **3.11+**?
 
-```bash
-python - <<'PY'
-import os, pathlib, json
-
-root = pathlib.Path("src/parallel")
-files = []
-for p in root.rglob("*.py"):
-    files.append(str(p))
-print("FILES:", json.dumps(sorted(files), indent=2))
-
-print("\n---BEGIN_SOURCES---")
-for p in sorted(root.rglob("*.py")):
-    print(f"\n### FILE: {p.as_posix()}\n")
-    print(p.read_text(encoding="utf-8", errors="replace"))
-print("\n---END_SOURCES---")
-PY
-```
-
-Then I’ll produce the single `.pyi`.
-
----
-
-### One question before I generate it
-Do you want the stub to include **only the public API** (what’s exported from `parallel/__init__.py` and documented entrypoints), or **everything** in `src/parallel/**` including internal modules?
-
-Reply with:
-1) the sources (Option A or B), and  
-2) “public-only” or “everything”.
+Once you provide the files (any of the options above), I’ll return a complete `parallel.pyi` in one code block.

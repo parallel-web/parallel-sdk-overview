@@ -1,49 +1,71 @@
-I can, but I can’t access that URL directly from here. If you paste the contents of the `src/` tree (or upload a zip / give me the files inline), I’ll generate a single consolidated `index.d.ts` that summarizes the full public API footprint.
+I can, but I can’t directly fetch that GitHub/Uithub URL from here. If you paste the repo contents (or upload a zip) of `src/` (or at least all exported `.ts` files plus `package.json`/`tsconfig.json`/`index.ts` barrel), I’ll generate a single consolidated `.d.ts` that mirrors the public API and preserves doc-comments 1:1.
 
-To make this fast and accurate (and to preserve doc-comments 1:1), please provide one of the following:
+In the meantime, here are two practical options:
 
-## Option A (best): upload a zip
-Zip the repo (or just `src/`) and upload it here.
+## Option A (fastest): You paste files here
+Send:
+- `src/**` (all `.ts` files), especially anything under `src/index.ts` or barrel exports
+- any `src/**/*.d.ts` if present
+- `package.json` (to know main/types entry)
+- `tsconfig.json` if it affects `paths`/exports
 
-## Option B: paste files
-Paste:
-- a directory listing of `src/`
-- then the contents of each `.ts` file in `src/` (and any `.d.ts` already present)
+Then I will return a single `parallel-sdk-typescript.d.ts` with:
+- all exported types/classes/functions/interfaces
+- re-export structure flattened into one file
+- doc comments copied verbatim (no edits)
+- `declare module "parallel-sdk-typescript"` (or the actual package name) wrapper if appropriate
 
-## Option C: run a script locally and paste output
-From the repo root, run:
+## Option B (you run a script; I produce the final file)
+If you can run commands locally, this will generate a clean API “footprint” `.d.ts` automatically, then you can share it and I’ll optionally post-process to make it more LLM-friendly (still without changing doc-comments).
 
+### 1) Generate a rolled-up declaration file
+Install:
 ```bash
-# prints all src TS files with headers so you can paste once
-python - <<'PY'
-import os, pathlib
-root = pathlib.Path("src")
-for p in sorted(root.rglob("*.ts")):
-    print("\n" + "="*80)
-    print(str(p))
-    print("="*80)
-    print(p.read_text(encoding="utf-8"))
-PY
+npm i
+npm i -D dts-bundle-generator typescript
 ```
 
-Then paste the output.
+Create `dtsgen.mjs`:
+```js
+import { generateDtsBundle } from "dts-bundle-generator";
+import { writeFileSync } from "node:fs";
+
+const entry = "src/index.ts"; // adjust if different
+const out = "parallel-sdk-typescript.d.ts";
+
+const [dts] = generateDtsBundle(
+  [{ filePath: entry }],
+  {
+    preferredConfigPath: "./tsconfig.json",
+    // Keep doc comments:
+    respectPreserveConstEnum: true,
+  }
+);
+
+writeFileSync(out, dts, "utf8");
+console.log("Wrote", out);
+```
+
+Run:
+```bash
+node dtsgen.mjs
+```
+
+Then upload/paste the resulting `parallel-sdk-typescript.d.ts` here and tell me the npm package name you want in the `declare module "..."` wrapper (if any). I can also:
+- ensure it includes any non-index exports
+- include global/ambient module declarations if the package uses them
+- keep JSDoc exactly as-is (copied 1:1 from sources where emitted)
 
 ---
 
-### What I will produce
-A single `parallel-sdk.d.ts` (or `index.d.ts`) that:
-
-- Re-exports the public surface area (types, interfaces, classes, functions, constants).
-- Inlines/aggregates types so an LLM can understand usage without jumping files.
-- Preserves **all doc-comments exactly 1:1** (copied verbatim), attached to the declarations they document.
-- Avoids implementation details (no function bodies), only signatures/types.
-- Handles `export *`, `export { ... }`, default exports, namespaces/modules, and path aliases if present.
+### One important constraint about “copy doc-comments 1:1”
+TypeScript declaration emit often *drops* some comments depending on how they’re attached and compiler settings. If you want truly 1:1 comment preservation, I should build the `.d.ts` by parsing the source AST and extracting leading JSDoc blocks for exported symbols. I can do that—but I need the source text.
 
 ---
 
-### One quick question (so I match your intent)
-Do you want the `.d.ts` to reflect:
-1) **Everything in `src/`** (including internal/non-public exports), or  
-2) Only what’s reachable from the library’s main entrypoint (e.g., `src/index.ts`)?
+## Next step
+Either:
+1) Paste/upload the `src/` directory contents here, **or**
+2) Run the script above and share the generated `.d.ts`.
 
-If you tell me which, and provide the files via A/B/C above, I’ll generate the single consolidated `.d.ts`.
+If you tell me what the actual entrypoint is (e.g., `src/index.ts` vs `src/client.ts`) and the npm package name (from `package.json`), I’ll format the single-file `.d.ts` accordingly.
