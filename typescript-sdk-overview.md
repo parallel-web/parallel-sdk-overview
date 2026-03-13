@@ -1,86 +1,89 @@
-I can, but I can’t directly fetch/inspect that GitHub URL from here. If you paste the contents of `src/` (or upload a zip), I’ll generate a single consolidated `parallel-sdk.d.ts` with the API surface and copy all doc-comments 1:1.
+I can, but I can’t directly fetch that URL from here. If you paste (or upload) the contents of the `src/` folder (or a zip), I’ll generate a single consolidated `index.d.ts` that preserves doc-comments 1:1.
 
-Meanwhile, here’s exactly what I will produce, and a ready-to-run script you can use to generate it locally from that repo (including preserving JSDoc as-is). If you run it and paste the produced `parallel-sdk.d.ts` back here, I can also sanity-check it for completeness.
+In the meantime, here are two practical ways to get me the exact source quickly, and a small script you can run locally to produce the single `.d.ts` automatically (while preserving JSDoc as much as TypeScript allows):
 
 ---
 
-## Option A (recommended): Generate a single `.d.ts` from the repo with TypeScript
+## Option A (best): Upload the folder/zip here
+1. Download the repo (or just `src/`) as a zip.
+2. Upload it in this chat.
+3. Tell me whether you want:
+   - **Public API only** (recommended for an LLM), or
+   - **Everything** including internal types.
 
-This uses the TypeScript compiler to emit declarations and then bundles them into one file.
+Then I’ll return a single `.d.ts` file.
 
-### 1) Install tools
-```bash
-npm i -D typescript rollup rollup-plugin-dts
-```
+---
 
-### 2) Add a `tsconfig.declarations.json`
-Create `tsconfig.declarations.json` at repo root:
+## Option B: Paste key files
+If uploading isn’t possible, paste:
+- `src/index.ts` (or whatever your entry file is)
+- Any `src/**/client*.ts`, `src/**/types*.ts`, and `src/**/index.ts`
+- `package.json` (to find the entrypoints)
 
-```json
+---
+
+## Option C: Generate it locally (script) and paste the output
+This produces a **single .d.ts** from the TS sources.
+
+### 1) Add a temporary `tsconfig.types.json` at repo root
+```jsonc
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "declaration": true,
     "emitDeclarationOnly": true,
-    "declarationMap": false,
     "stripInternal": false,
-    "removeComments": false,
-    "outDir": "dist-types"
+    "declarationMap": false,
+    "outFile": "./dist/parallel-sdk.d.ts",
+    "module": "system",
+    "target": "ES2020",
+    "removeComments": false
   },
   "include": ["src/**/*"]
 }
 ```
 
-### 3) Build `.d.ts` files
+### 2) Build declarations
 ```bash
-npx tsc -p tsconfig.declarations.json
+npx tsc -p tsconfig.types.json
 ```
 
-### 4) Bundle into a single `.d.ts`
-Create `rollup.dts.config.mjs`:
+This will create:
+- `dist/parallel-sdk.d.ts` (single file)
 
-```js
-import dts from "rollup-plugin-dts";
+> Note: `outFile` requires `module` to be `system` or `amd`. This is fine for “LLM readability” even if it’s not how you ship the package.
 
-export default {
-  input: "./dist-types/index.d.ts",   // if your entry is different, change this
-  output: [{ file: "parallel-sdk.d.ts", format: "es" }],
-  plugins: [dts()]
-};
-```
-
-Then run:
-```bash
-npx rollup -c rollup.dts.config.mjs
-```
-
-This will output `parallel-sdk.d.ts` containing the full public type footprint, usually with doc-comments preserved (as long as `removeComments` isn’t enabled and the comments exist in the TS sources).
-
-> If the package entrypoint isn’t `src/index.ts`, tell me what it is (or show the repo’s `package.json` + `src/` tree) and I’ll adjust the bundling input.
+### 3) Paste `dist/parallel-sdk.d.ts` here
+Then I can:
+- ensure the footprint is readable,
+- optionally re-order/group namespaces/modules for clarity,
+- and **verify doc-comments are preserved**.
 
 ---
 
-## Option B: I handcraft a single “API footprint” `.d.ts` (LLM-oriented)
-If you want something more “summarized” (still type-correct, but organized for readability), I can generate a curated `.d.ts` that:
-- re-exports the main client(s)
-- flattens key namespaces/modules
-- preserves all doc-comments 1:1 (copied)
-- includes only the public surface (not internal helpers)
+## One important constraint about “copying doc-comments 1:1”
+TypeScript declaration emit generally **preserves JSDoc**, but it may:
+- drop some comments in certain cases,
+- move them (e.g., attach to emitted symbols),
+- not preserve *every* non-JSDoc comment.
 
-To do this accurately, I need the source files.
+If you truly need **exact 1:1** comment text as written in source, the safest approach is:
+- parse source with `ts-morph` and re-emit a custom `.d.ts`-like summary while copying raw comment blocks.
+I can do that too, but I need the source files.
 
 ---
 
 ## What I need from you
-Pick one:
+Choose one:
 
-1) **Upload / paste**:
-- `src/**` (all `.ts` files), or
-- a zip/tar of the repo, or
-- at minimum: `src/index.ts` plus any files it exports/re-exports (and their dependencies if types are referenced).
+1) Upload the `src/` folder (zip), or  
+2) Paste the files, or  
+3) Run the above and paste `dist/parallel-sdk.d.ts`.
 
-2) Or run the script above and paste:
-- the generated `parallel-sdk.d.ts`
-- plus the repo’s `package.json` (so I can confirm the intended entrypoint and exports map).
+Also tell me which style you want:
 
-Once I have that, I’ll return a single `.d.ts` file in one code block, with doc-comments copied 1:1.
+- **“Flattened public API”**: one module with exported classes/interfaces/types only (best for LLMs)
+- **“Preserve module paths”**: keeps `declare module "…"` blocks matching imports
+
+Once I have the code, I’ll produce the single `.d.ts` as requested.
