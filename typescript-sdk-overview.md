@@ -1,30 +1,31 @@
-I can do that, but I can’t directly fetch or browse that GitHub URL from here. If you paste the contents of the `src/` directory (or upload a zip), I’ll generate a single consolidated `index.d.ts` that:
+I can do that, but I can’t access external URLs from here, so I can’t read `https://uithub.com/parallel-web/parallel-sdk-typescript/tree/main/src` directly.
 
-- merges/re-exports all public types/classes/functions into one file
-- preserves **all existing doc-comments 1:1** (verbatim)
-- keeps module structure either as one global module or as `declare module "parallel-sdk"` (your preference)
+If you paste the contents of the `src/` tree (or upload a zip / paste key files), I’ll generate a **single consolidated `index.d.ts`** that summarizes the public API footprint and **copies doc-comments 1:1**.
 
 ### What I need from you
-Pick one of these options:
+Pick one of these:
 
-1) **Upload a zip** of the repo (or just `src/`) here, or  
-2) Paste:
-   - `src/index.ts` (or whatever the entrypoint is)
-   - every `.ts` file under `src/` that is exported publicly (or just paste the whole folder contents)
+1) **Upload/paste the repo files**
+- Easiest: paste a directory listing + contents of all `.ts` files under `src/`.
+- Or upload a zip of the `src` folder.
 
-Also tell me:
+2) **If you can run commands locally**, paste outputs:
+- `ls -R src`
+- `sed -n '1,200p' src/<file>.ts` (repeat for each file)  
+  (Or just paste the whole files.)
 
-- **Package name** to declare (from `package.json` `name`), e.g. `parallel-sdk` (if you want `declare module "…"` style)
-- Target style:
-  - A) `declare module "PACKAGE_NAME" { ... }` (most useful for LLM + TS consumption)
-  - B) top-level `export ...` (like a normal `.d.ts` file without a wrapper module)
+3) **If you can run a script**, I can give you one that prints all source files in one block.
 
-### If you want to do it with minimal copying
-Run this locally and paste the output:
+### What I will produce
+- A single `.d.ts` file (e.g. `parallel-sdk.d.ts`) that:
+  - re-exports the public entrypoints
+  - includes all exported classes/interfaces/types/functions/enums
+  - preserves JSDoc/doc-comments **verbatim**
+  - flattens internal module structure into one file (or keeps namespaces if needed)
+  - removes implementation bodies, keeping only type signatures
 
-```bash
-# from repo root
-find src -type f -name "*.ts" -print0 | xargs -0 -I{} sh -c 'echo "\n\n//// FILE: {}"; cat "{}"'
-```
+### Two quick questions (so I format it correctly)
+1) What is the package entrypoint—`src/index.ts` (or something else)?
+2) Do you want **only exported/public** symbols, or literally everything in `src` (including internal non-exported types)?
 
-Then I’ll return a single `.d.ts` file that reflects the full public API surface.
+If you paste the `src/index.ts` (and any barrel files it re-exports), I can start immediately and then iterate until the consolidated `.d.ts` matches the full surface area.

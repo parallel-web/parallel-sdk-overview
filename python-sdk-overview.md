@@ -1,12 +1,15 @@
-I can do this, but I can’t directly fetch that URL from within this chat session.
+I can do this, but I can’t access that GitHub/Uithub link from inside this chat environment. If you paste the repository contents (or upload a zip / paste the files under `src/parallel`), I’ll generate a single consolidated `parallel.pyi` that reflects the full public API surface and will copy docstrings 1:1.
 
-If you paste the repository contents (or upload a zip / paste the files under `src/parallel/**`), I’ll generate a single consolidated `parallel.pyi` that mirrors the full public API surface and copies docstrings 1:1 where present.
+To make this easy, here are two fast ways to provide the code:
 
-### What I need from you
-Any one of these is enough:
+## Option A (best): Upload a zip
+1. Download the repo (or just the `src/parallel` folder).
+2. Zip it.
+3. Upload it here.
 
-1) **Upload** the `src/parallel` directory (as a zip), or  
-2) Paste the output of:
+## Option B: Paste via `tar`/`zip`-like text bundle
+Run this from the repo root and paste the output:
+
 ```bash
 python - <<'PY'
 import os
@@ -15,24 +18,32 @@ for dirpath, _, filenames in os.walk(root):
     for fn in sorted(filenames):
         if fn.endswith(".py"):
             path=os.path.join(dirpath, fn)
-            print("\n\n# =====", path, "=====")
+            print("\n" + "="*80)
+            print(path)
+            print("="*80)
             with open(path, "r", encoding="utf-8") as f:
                 print(f.read())
 PY
 ```
-3) Or paste the files manually (even in chunks).
 
-### What I will produce
-- A **single** `parallel.pyi` containing:
-  - all public modules/classes/functions/constants
-  - method signatures (including overloads where needed)
-  - `TypedDict`/`Protocol`/`Literal`/`Enum` as appropriate
-  - imports / re-exports to reflect how the package is meant to be used
-  - **doc-comments copied verbatim** (triple-quoted docstrings placed in the stub at the same symbols)
+---
 
-### Quick questions (optional)
-If you answer these, I can tailor it better:
-1) Should the stub include **only public API** (`__all__`, non-underscore), or **everything**?
-2) Should I resolve dynamic exports in `__init__.py` (e.g., re-exported names) so the stub reflects `import parallel as ...` usage?
+## What I will produce
+A **single** `.pyi` file that:
+- contains all modules/classes/functions/constants/types exposed by the package
+- preserves docstrings **verbatim** (copied 1:1) wherever they exist (module/class/function docstrings)
+- includes imports/typing constructs needed for completeness
+- follows typical stub conventions (`...` bodies, `@overload` where needed)
+- includes `__all__` if present / relevant to public surface
+- covers nested modules under `parallel.*` in one file (namespaced via comments + re-export patterns)
 
-Send the code (option 1/2/3), and I’ll return the complete `.pyi` in one block.
+---
+
+## One clarification (so the stub matches your needs)
+When you say “entire footprint of the API”, do you want:
+1) **Only public API** (exports + non-underscore names), or  
+2) **Everything**, including private `_internal` helpers?
+
+Tell me `public` or `all`. If you’re not sure, I’ll default to **public**.
+
+Once you provide the code, I’ll return the complete consolidated `parallel.pyi` in one block.
