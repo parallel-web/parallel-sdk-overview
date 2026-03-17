@@ -1,36 +1,35 @@
-I can do this, but I can’t directly fetch that GitHub URL from within this chat environment.
+I can, but I can’t access that URL from here to read the repo contents directly. If you paste (or upload) the contents of the `src/` directory (or a zip), I’ll generate a single consolidated `.d.ts` that reflects the public API surface and I’ll copy doc-comments **1:1** exactly as they appear.
 
-If you paste the contents of the `src/` directory (or upload a zip / paste the key files), I’ll generate a single consolidated `parallel-sdk.d.ts` that:
+If you want to do it yourself quickly, here are two easy ways to get me the inputs:
 
-- re-exports the public surface area,
-- inlines all types/interfaces/classes into one file (as a “footprint”),
-- preserves doc-comments **1:1** wherever they exist (I won’t reword them),
-- keeps module/export structure clear for an LLM to understand usage.
+## Option A: Upload a zip
+1. Download the repo (or just `src/`) as a zip.
+2. Upload it here.
+3. Tell me whether you want the footprint to include **only exported/public** items or **everything** in `src/`.
 
-### What I need from you
-Pick one:
+## Option B: Paste files (recommended minimal set)
+Run this from the repo root and paste the output:
 
-1) **Upload** the repository or just the `src/` folder contents here, or  
-2) Paste:
-   - `src/index.ts` (or whatever the entrypoint is)
-   - all files it exports (and their transitive type dependencies), or  
-3) Tell me the package name + entry file and paste `package.json` + `src/**`.
-
-### Quick sanity questions (so the .d.ts is accurate)
-Reply with:
-1. What should the module name be in the d.ts?
-   - e.g. `declare module "parallel-sdk"` vs just generating a global/ambient file.
-2. Should I include **only public exports** (recommended), or **everything in src**?
-3. Do you want it to be “flattened” (single namespace-ish file) or preserve `declare module` boundaries but still in one physical file?
-
-### If you want to do it fastest
-Paste `src/index.ts` first. I’ll inspect exports and tell you exactly which additional files I need, then produce the final single `.d.ts`.
-
-Once I have the source text, I’ll return one ready-to-save file like:
-
-```ts
-// parallel-sdk.d.ts
-declare module "parallel-sdk" {
-  // ... full API footprint here, with doc-comments copied 1:1
-}
+```bash
+git ls-files 'src/**/*' -z | xargs -0 -I{} sh -c 'echo "\n// FILE: {}\n"; sed -n "1,2000p" "{}"'
 ```
+
+(If files are huge, we can do it in chunks.)
+
+---
+
+## Clarifications (so the .d.ts is what you want)
+1. **Public surface rule:** Should I include only things reachable from the package entrypoint (e.g., `src/index.ts` exports), or every `export` in every file?
+2. **Node vs browser:** Should the `.d.ts` assume DOM libs, Node libs, or both?
+3. **Namespacing:** Do you want one `declare module "parallel-sdk"` block (or the real package name), or just top-level `export` declarations?
+
+---
+
+## What I will produce
+A single `parallel-sdk-footprint.d.ts` that:
+- Re-exports and inlines types/interfaces/classes/functions
+- Preserves **all JSDoc/doc-comments 1:1** where present
+- Flattens internal imports so an LLM can read one file end-to-end
+- Keeps overloads, generics, namespaces, enums, literal unions, etc.
+
+Send `src/` and (optionally) `package.json` + the main entry file (often `src/index.ts`), and I’ll generate the consolidated `.d.ts`.
