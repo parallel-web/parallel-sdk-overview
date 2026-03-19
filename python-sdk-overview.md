@@ -1,48 +1,52 @@
-I can do that, but I can’t directly access external URLs from here. If you paste the source (or upload a zip / paste the files from `src/parallel/**.py`), I’ll generate a single consolidated `parallel.pyi` that reflects the public API surface and will copy docstrings/comments 1:1 where present.
+I can, but I can’t directly fetch that GitHub/uithub URL from here. If you paste the contents of the `src/parallel/` package (or upload a zip / the files), I’ll generate a single consolidated `parallel.pyi` that mirrors the full public API surface and **copies docstrings 1:1** wherever present.
 
-To make this easy, please provide one of the following:
+To make this easy, you have two good options:
 
-## Option A (best): paste a tar/zip listing
-Upload a zip/tar of `src/parallel/` (or the whole repo). I’ll extract and produce one `parallel.pyi`.
+## Option A) Upload the package files here
+Upload a `.zip` of `src/parallel/` (or the whole repo). I’ll read it and return one `.pyi`.
 
-## Option B: paste the raw files
-Paste the contents of all `*.py` files under `src/parallel/` (including subpackages). If it’s long, paste in multiple messages.
+## Option B) Paste a tarball / file contents
+If you can’t upload, paste the contents of each `.py` file under `src/parallel/` (including `__init__.py`). I’ll stitch them together.
 
-## Option C: run a script locally and paste the output
-Run this to print every module file content, then paste the output here:
+---
+
+## What I will produce
+A single `parallel.pyi` that:
+- Includes all public classes/functions/constants/types exported by the package
+- Includes method signatures, attributes, overloads where needed
+- Preserves module structure via qualified names and/or section headers
+- Copies docstrings/doc-comments **verbatim** (1:1) into the `.pyi` as triple-quoted strings attached to the same objects
+- Uses `typing` constructs (`Protocol`, `TypedDict`, `Literal`, `overload`, generics, etc.) as appropriate
+- Avoids implementation bodies (stub-only)
+
+---
+
+## Quick checklist of what I need from you
+Please provide one of the following:
+1) A zip upload of `src/parallel/`, **or**
+2) The list of files plus their contents.
+
+If you upload/paste, include:
+- `src/parallel/__init__.py`
+- Any subpackages (e.g., `client.py`, `types.py`, `models/`, `resources/`, etc.)
+- Anything that defines exported symbols or re-exports
+
+---
+
+## If you want, I can also generate it automatically on your machine
+Run this and paste the output (it prints a single combined file). This doesn’t preserve docstrings 1:1 reliably unless we read sources, so it’s only a fallback:
 
 ```bash
-python - <<'PY'
-import os
-root = os.path.join("src", "parallel")
-for dirpath, _, filenames in os.walk(root):
-    for fn in sorted(filenames):
-        if fn.endswith(".py"):
-            path = os.path.join(dirpath, fn)
-            print("\n" + "="*80)
-            print(path)
-            print("="*80)
-            with open(path, "r", encoding="utf-8") as f:
-                print(f.read())
-PY
+python -c "import pkgutil, parallel, inspect, textwrap, sys; \
+mods=[]; \
+pkg=parallel; \
+prefix=pkg.__name__+'.'; \
+for m in pkgutil.walk_packages(pkg.__path__, prefix): mods.append(m.name); \
+print('\n'.join(mods))"
 ```
 
----
-
-### What I will produce
-A **single** `.pyi` file (e.g., `parallel_api.pyi`) that:
-
-- Mirrors the **public footprint** of the package (classes, functions, constants, exceptions, type aliases).
-- Preserves **docstrings/doc-comments 1:1** wherever present (I’ll copy them exactly).
-- Uses standard stub conventions (`...` bodies).
-- Includes re-exports from `parallel/__init__.py` so an LLM can understand the “front door” API.
-- Keeps typing accurate (Parameters, returns, overloads, `Literal`, `TypedDict`, `Protocol`, etc. where present).
+But the best path is: **send the source files**, and I’ll do an exact docstring-preserving stub.
 
 ---
 
-### One quick question (so I match your intent)
-Do you want the stub to represent:
-1) only what’s imported/re-exported from `parallel/__init__.py` (end-user surface), or  
-2) **everything** in the package (all modules, including internal helpers)?
-
-Tell me **(1)** or **(2)** and paste/upload the code, and I’ll generate the consolidated `.pyi`.
+Send the files (zip or paste), and tell me whether you want the stub named `parallel.pyi` (package-level) or a top-level `parallel_sdk.pyi` (single-file “API view”).
