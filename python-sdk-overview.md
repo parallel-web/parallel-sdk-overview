@@ -1,52 +1,50 @@
-I can, but I can’t directly fetch that GitHub/uithub URL from here. If you paste the contents of the `src/parallel/` package (or upload a zip / the files), I’ll generate a single consolidated `parallel.pyi` that mirrors the full public API surface and **copies docstrings 1:1** wherever present.
+I can do this, but I can’t access that URL from here. If you paste the source (or upload a zip / the `src/parallel` folder contents), I’ll generate a single consolidated `parallel.pyi` that reflects the full public API surface and will copy docstrings/comments 1:1.
 
-To make this easy, you have two good options:
+### What I need from you
+One of:
+1. Upload the repository as a zip, or
+2. Paste the contents of all Python files under `src/parallel/**.py`, or
+3. Paste a `tar`/`zip` listing + file contents.
 
-## Option A) Upload the package files here
-Upload a `.zip` of `src/parallel/` (or the whole repo). I’ll read it and return one `.pyi`.
+### What I will produce
+- A **single** `parallel.pyi` file that:
+  - Includes all public classes/functions/constants/types re-exported by the package.
+  - Preserves **docstrings exactly** (1:1) wherever present (I’ll place them as triple-quoted strings in the stub, in the same locations).
+  - Adds typing imports and `typing` constructs (`Protocol`, `TypedDict`, overloads, generics, etc.) to match the code structure.
+  - Uses `...` for bodies as required by `.pyi`.
 
-## Option B) Paste a tarball / file contents
-If you can’t upload, paste the contents of each `.py` file under `src/parallel/` (including `__init__.py`). I’ll stitch them together.
+### If you want to DIY (optional): one-command bundle to paste here
+From the repo root, run one of these and paste the output:
 
----
-
-## What I will produce
-A single `parallel.pyi` that:
-- Includes all public classes/functions/constants/types exported by the package
-- Includes method signatures, attributes, overloads where needed
-- Preserves module structure via qualified names and/or section headers
-- Copies docstrings/doc-comments **verbatim** (1:1) into the `.pyi` as triple-quoted strings attached to the same objects
-- Uses `typing` constructs (`Protocol`, `TypedDict`, `Literal`, `overload`, generics, etc.) as appropriate
-- Avoids implementation bodies (stub-only)
-
----
-
-## Quick checklist of what I need from you
-Please provide one of the following:
-1) A zip upload of `src/parallel/`, **or**
-2) The list of files plus their contents.
-
-If you upload/paste, include:
-- `src/parallel/__init__.py`
-- Any subpackages (e.g., `client.py`, `types.py`, `models/`, `resources/`, etc.)
-- Anything that defines exported symbols or re-exports
-
----
-
-## If you want, I can also generate it automatically on your machine
-Run this and paste the output (it prints a single combined file). This doesn’t preserve docstrings 1:1 reliably unless we read sources, so it’s only a fallback:
-
+**macOS/Linux**
 ```bash
-python -c "import pkgutil, parallel, inspect, textwrap, sys; \
-mods=[]; \
-pkg=parallel; \
-prefix=pkg.__name__+'.'; \
-for m in pkgutil.walk_packages(pkg.__path__, prefix): mods.append(m.name); \
-print('\n'.join(mods))"
+python - <<'PY'
+import os, pathlib
+root = pathlib.Path("src/parallel")
+for p in sorted(root.rglob("*.py")):
+    print("\n" + "="*80)
+    print(str(p))
+    print("="*80)
+    print(p.read_text(encoding="utf-8", errors="replace"))
+PY
 ```
 
-But the best path is: **send the source files**, and I’ll do an exact docstring-preserving stub.
+**Windows (PowerShell)**
+```powershell
+python - <<'PY'
+import pathlib
+root = pathlib.Path("src/parallel")
+for p in sorted(root.rglob("*.py")):
+    print("\n" + "="*80)
+    print(str(p))
+    print("="*80)
+    print(p.read_text(encoding="utf-8", errors="replace"))
+PY
+```
 
----
+### Quick clarification (so the stub is maximally useful)
+Tell me which you prefer:
+- **Strict public API only** (things in `__all__` or not prefixed with `_`, and anything imported/re-exported from `parallel/__init__.py`), or
+- **Everything importable** (including “internal” modules).
 
-Send the files (zip or paste), and tell me whether you want the stub named `parallel.pyi` (package-level) or a top-level `parallel_sdk.pyi` (single-file “API view”).
+Once you paste/upload the code, I’ll return the complete single `parallel.pyi` file.
