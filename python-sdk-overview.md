@@ -1,35 +1,48 @@
-I can, but I can’t directly fetch that URL from here. If you paste (or upload) the contents of the `src/parallel/` package (all `.py` files) or a zip of the repo, I’ll generate a single consolidated `parallel.pyi` stub that summarizes the public API surface and preserves docstrings **verbatim** (1:1).
+I can, but I can’t access that URL directly from here. If you paste the package source (or upload a zip / paste the tree contents), I’ll generate a single consolidated `parallel.pyi` that includes the full public API surface and copies docstrings 1:1.
 
-In the meantime, here are two practical ways to get me what I need, plus the exact output format I’ll produce.
+To make this easy, please do one of these:
 
-## Option A (best): upload a zip
-1. Download the repo (or just the `src/parallel` folder).
-2. Zip `src/parallel/`.
-3. Upload the zip here.
+## Option A (best): paste an archive listing + files
+1) Download the repo locally.
+2) Zip the `src/parallel` folder.
+3) Upload it here.
 
-## Option B: paste file contents
-Paste each file with a header like:
+## Option B: paste raw files
+Paste the contents of all `src/parallel/**/*.py` files (including `__init__.py`).
 
-```text
-# FILE: src/parallel/__init__.py
-...contents...
+## Option C: I guide you to generate it locally
+If you can run commands locally, do:
 
-# FILE: src/parallel/client.py
-...contents...
+```bash
+python -c "import os,glob; 
+root='src/parallel'; 
+files=sorted(glob.glob(root+'/**/*.py', recursive=True)); 
+print('\n'.join(files))"
 ```
 
-## What I will return
-A **single** `parallel.pyi` containing:
-- All exported classes/functions/constants/types across the package
-- Re-export behavior reflected (e.g., what `parallel/__init__.py` exposes)
-- Signatures (args/kwargs/defaults), async vs sync, overloads if relevant
-- Typed attributes for dataclasses / pydantic models when possible
-- **Doc-comments copied 1:1** (module/class/function docstrings and doc comments)
+Then for each file:
 
-## Quick questions (so the stub matches your intent)
-1. Do you want *only public API* (non-underscore names and things exported via `__all__`) or **everything**?
-2. Should I include third-party base classes/types as imports (e.g., `pydantic.BaseModel`) or replace them with `Any` to keep it standalone?
+```bash
+python - <<'PY'
+import pathlib
+p = pathlib.Path("src/parallel/__init__.py")  # change per file
+print(f"\n### FILE: {p}\n")
+print(p.read_text(encoding="utf-8"))
+PY
+```
 
 ---
 
-If you upload `src/parallel` (zip or pasted files), I’ll generate the complete `.pyi` in one response.
+### What I will produce once you provide the code
+A single `parallel.pyi` that:
+
+- Flattens and re-exports the package footprint (modules, classes, functions, constants)
+- Preserves *exact* docstrings as comments right above the corresponding stubs (copied 1:1)
+- Includes typing for parameters/returns as best as can be inferred from annotations (and falls back to `Any` where needed)
+- Captures `__all__` exports and what `parallel.__init__` re-exports
+- Includes key protocols / TypedDicts / Enums / Exceptions if present
+
+---
+
+### Quick question (so the result matches what you want)
+Should the `.pyi` include **only public API** (exported/re-exported names) or **everything in the package** (including internal `_` modules/classes)?

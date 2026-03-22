@@ -1,52 +1,71 @@
-I can do that, but I can’t directly fetch content from that URL from within this chat. If you paste the contents of the `src/` TypeScript files here (or upload a zip / provide the raw file text), I’ll generate a single consolidated `index.d.ts` that summarizes the whole public API surface and **will copy doc-comments 1:1** wherever they exist.
+I can do that, but I can’t directly access external URLs from here. If you paste the contents of that `src/` directory (or upload a zip / paste files), I’ll generate a single consolidated `.d.ts` that summarizes the full public API surface, preserving **doc-comments 1:1**.
 
-In the meantime, here are two quick ways to get me the exact input I need with minimal effort:
+In the meantime, here are two ways to get me the source quickly, and a script you can run to generate the dump.
 
-## Option A (best): paste a single combined dump of `src/`
-From the repo root:
+## Option A (best): Paste a repo snapshot (single text dump)
+Run this locally in the repo root:
 
 ```bash
+# 1) clone if you haven't
 git clone https://github.com/parallel-web/parallel-sdk-typescript.git
 cd parallel-sdk-typescript
-find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print0 | sort -z | xargs -0 -I{} sh -c 'echo "\n\n// FILE: {}"; sed -n "1,2000p" "{}"' > src_dump.txt
+
+# 2) dump src as one text file (keeps paths as headers)
+python - <<'PY'
+import os
+root="src"
+out="SRC_DUMP.txt"
+with open(out,"w",encoding="utf-8") as f:
+    for dirpath, _, filenames in os.walk(root):
+        for name in sorted(filenames):
+            if not name.endswith((".ts",".tsx",".js",".jsx",".d.ts")):
+                continue
+            path=os.path.join(dirpath,name)
+            f.write("\n" + "="*90 + "\n")
+            f.write(path.replace("\\","/") + "\n")
+            f.write("="*90 + "\n\n")
+            with open(path,"r",encoding="utf-8") as rf:
+                f.write(rf.read())
+                if not rf.read().endswith("\n"):
+                    f.write("\n")
+print("Wrote", out)
+PY
 ```
 
-Then paste `src_dump.txt` here (or upload it).
+Then paste `SRC_DUMP.txt` here.
 
-## Option B: generate declarations locally and share them
-If the package builds cleanly, you can generate `.d.ts` output:
+## Option B: Upload files
+Upload a zip of `src/` (or the whole repo). I’ll extract and produce the single `.d.ts`.
 
-1) Ensure `tsconfig.json` has:
-```json
-{
-  "compilerOptions": {
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "declarationMap": false
-  }
-}
-```
+## Option C: You generate types and I consolidate them
+If the package builds declarations, you can run:
 
-2) Run:
 ```bash
-npx tsc -p tsconfig.json
+npm i
+npm run build
 ```
 
-3) Then share the generated `.d.ts` files from `dist/` (or wherever `outDir` points). I’ll merge them into a single file and preserve doc-comments.
+and send me the generated `.d.ts` outputs (often in `dist/` or `build/`), plus any hand-written `.d.ts` and public entrypoints. I’ll merge into one clean “LLM footprint” file.
 
 ---
 
 ## What I will produce
-A single file (e.g. `parallel-sdk.d.ts`) that:
+A single file, e.g. `parallel-sdk.d.ts`, that:
 
-- Preserves the **public footprint** (exports, classes, interfaces, types, functions, enums).
-- Keeps **JSDoc/doc-comments exactly as-is** (1:1).
-- Normalizes re-exports into one place so an LLM can scan it easily.
-- Avoids implementation details; only typings/signatures.
+- Mirrors the **public exports** (from `src/index.ts` and re-exports).
+- Includes **types/interfaces/classes/functions** that are part of the public surface.
+- Preserves **JSDoc/doc-comments exactly** (1:1, no edits).
+- Flattens/merges modules into one declaration file (either as `declare module "..."` blocks or a single top-level namespace-style surface—your preference).
 
-## One question
-Do you want the “API footprint” to include:
-1) only what’s exported from the package entrypoint (e.g. `src/index.ts`), or  
-2) everything exported anywhere under `src/`?
+---
 
-Reply with (1) or (2), and paste/upload the `src` contents (Option A) or generated `.d.ts` (Option B), and I’ll output the single consolidated `.d.ts` file.
+## Two quick questions (so I format it the way you want)
+1. Do you want the output as:
+   - **A)** `declare module "@parallel/sdk"` style (recommended for LLM + TS consumers), or
+   - **B)** a global `declare namespace Parallel { ... }` style?
+
+2. Which import specifier should the declaration represent? (e.g. `"parallel-sdk"`, `"@parallel-web/sdk"`, etc.). If you’re not sure, I’ll infer it from `package.json` `name` + `exports`.
+
+---
+
+Send me either the `SRC_DUMP.txt` or a zip of the `src/` directory and I’ll generate the single consolidated `.d.ts` immediately.
