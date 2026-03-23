@@ -1,48 +1,29 @@
-I can, but I can’t access that URL directly from here. If you paste the package source (or upload a zip / paste the tree contents), I’ll generate a single consolidated `parallel.pyi` that includes the full public API surface and copies docstrings 1:1.
+I can do this, but I can’t access external URLs from here, so I can’t read the repo contents at that link directly.
 
-To make this easy, please do one of these:
+If you paste (or upload) the source tree for `src/parallel/` (or a zip of the repo), I’ll generate a **single consolidated `parallel.pyi`** that mirrors the full public API surface, and I’ll **copy docstrings/comments 1:1** wherever they exist.
 
-## Option A (best): paste an archive listing + files
-1) Download the repo locally.
-2) Zip the `src/parallel` folder.
-3) Upload it here.
+### What I need from you
+Any one of these works:
 
-## Option B: paste raw files
-Paste the contents of all `src/parallel/**/*.py` files (including `__init__.py`).
+1. **Upload a zip** of the repository (best), or  
+2. Paste the contents of all `.py` files under:
+   - `src/parallel/**/*.py`
+3. If the package uses re-exports, also include:
+   - `src/parallel/__init__.py`
+   - any `py.typed` / typing-related files
+   - `pyproject.toml` (optional, helps determine package name/exports)
 
-## Option C: I guide you to generate it locally
-If you can run commands locally, do:
+### What I will produce
+- A **single file** (e.g., `parallel.pyi`) containing:
+  - all public modules/classes/functions/constants
+  - method signatures, overloads, async defs, properties
+  - exported names as seen from `parallel` top-level (including re-exports)
+  - imports for typing (e.g., `typing`, `typing_extensions`)
+  - **doc-comments/docstrings copied verbatim** (I will not rewrite them)
 
-```bash
-python -c "import os,glob; 
-root='src/parallel'; 
-files=sorted(glob.glob(root+'/**/*.py', recursive=True)); 
-print('\n'.join(files))"
-```
+### Quick question (so I output the right “footprint”)
+Should the `.pyi` represent:
+1) **Only what’s publicly exported** from `parallel` (what users import), or  
+2) **Everything under `src/parallel/`**, including internal modules?
 
-Then for each file:
-
-```bash
-python - <<'PY'
-import pathlib
-p = pathlib.Path("src/parallel/__init__.py")  # change per file
-print(f"\n### FILE: {p}\n")
-print(p.read_text(encoding="utf-8"))
-PY
-```
-
----
-
-### What I will produce once you provide the code
-A single `parallel.pyi` that:
-
-- Flattens and re-exports the package footprint (modules, classes, functions, constants)
-- Preserves *exact* docstrings as comments right above the corresponding stubs (copied 1:1)
-- Includes typing for parameters/returns as best as can be inferred from annotations (and falls back to `Any` where needed)
-- Captures `__all__` exports and what `parallel.__init__` re-exports
-- Includes key protocols / TypedDicts / Enums / Exceptions if present
-
----
-
-### Quick question (so the result matches what you want)
-Should the `.pyi` include **only public API** (exported/re-exported names) or **everything in the package** (including internal `_` modules/classes)?
+Reply with (1) or (2), and upload/paste the code, and I’ll generate the consolidated `.pyi`.

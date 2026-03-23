@@ -1,71 +1,109 @@
-I can do that, but I can’t directly access external URLs from here. If you paste the contents of that `src/` directory (or upload a zip / paste files), I’ll generate a single consolidated `.d.ts` that summarizes the full public API surface, preserving **doc-comments 1:1**.
+I can, but I can’t directly fetch that repository from the link you pasted from within this chat unless you provide the source contents (or at least the exported public surface). If you paste/upload the `src` tree (or a zip), I’ll generate a single consolidated `parallel-sdk.d.ts` that preserves doc-comments **1:1**.
 
-In the meantime, here are two ways to get me the source quickly, and a script you can run to generate the dump.
+In the meantime, here are two ways to get me what I need, plus a ready-to-run script that will generate a single `.d.ts` from the repo locally (often the fastest). If you run it and paste the output here, I’ll also clean it up into a “LLM-friendly” single-file summary if needed.
 
-## Option A (best): Paste a repo snapshot (single text dump)
-Run this locally in the repo root:
+---
 
-```bash
-# 1) clone if you haven't
-git clone https://github.com/parallel-web/parallel-sdk-typescript.git
-cd parallel-sdk-typescript
+## Option A (best): Upload the repo ZIP or paste `src/` files
+1. Download the repo (or just `src/`).
+2. Upload the zip here, or paste key files:
+   - `src/index.ts` (or main entry)
+   - any `src/**/*.ts` that are exported publicly
+   - `package.json` (to know entrypoints)
 
-# 2) dump src as one text file (keeps paths as headers)
-python - <<'PY'
-import os
-root="src"
-out="SRC_DUMP.txt"
-with open(out,"w",encoding="utf-8") as f:
-    for dirpath, _, filenames in os.walk(root):
-        for name in sorted(filenames):
-            if not name.endswith((".ts",".tsx",".js",".jsx",".d.ts")):
-                continue
-            path=os.path.join(dirpath,name)
-            f.write("\n" + "="*90 + "\n")
-            f.write(path.replace("\\","/") + "\n")
-            f.write("="*90 + "\n\n")
-            with open(path,"r",encoding="utf-8") as rf:
-                f.write(rf.read())
-                if not rf.read().endswith("\n"):
-                    f.write("\n")
-print("Wrote", out)
-PY
+Then I’ll produce one `parallel-sdk.d.ts`.
+
+---
+
+## Option B (fastest): Generate a single `.d.ts` locally via TypeScript
+In the repo root, create `tsconfig.types.json`:
+
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "stripInternal": false,
+    "outFile": "./parallel-sdk.d.ts",
+    "module": "system",
+    "target": "ES2020",
+    "noEmit": false
+  },
+  "include": ["src/**/*"]
+}
 ```
 
-Then paste `SRC_DUMP.txt` here.
-
-## Option B: Upload files
-Upload a zip of `src/` (or the whole repo). I’ll extract and produce the single `.d.ts`.
-
-## Option C: You generate types and I consolidate them
-If the package builds declarations, you can run:
+Then run:
 
 ```bash
 npm i
-npm run build
+npx tsc -p tsconfig.types.json
 ```
 
-and send me the generated `.d.ts` outputs (often in `dist/` or `build/`), plus any hand-written `.d.ts` and public entrypoints. I’ll merge into one clean “LLM footprint” file.
+This produces `parallel-sdk.d.ts` in the repo root.
+
+### If you hit “Only 'amd' and 'system' modules are supported alongside --outFile”
+That’s expected: `outFile` requires `module: "system"` (as above). If the repo’s TS config conflicts, keep this separate config.
 
 ---
 
-## What I will produce
-A single file, e.g. `parallel-sdk.d.ts`, that:
+## Option C: Bundle types with API Extractor (nice output)
+If the project is ESM and you want a single rolled-up `.d.ts` that preserves comments well:
 
-- Mirrors the **public exports** (from `src/index.ts` and re-exports).
-- Includes **types/interfaces/classes/functions** that are part of the public surface.
-- Preserves **JSDoc/doc-comments exactly** (1:1, no edits).
-- Flattens/merges modules into one declaration file (either as `declare module "..."` blocks or a single top-level namespace-style surface—your preference).
+```bash
+npm i -D @microsoft/api-extractor
+```
+
+Create `api-extractor.json`:
+
+```json
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
+  "mainEntryPointFilePath": "./dist/types/index.d.ts",
+  "dtsRollup": {
+    "enabled": true,
+    "untrimmedFilePath": "./parallel-sdk.d.ts"
+  },
+  "apiReport": { "enabled": false },
+  "docModel": { "enabled": false },
+  "messages": {
+    "compilerMessageReporting": { "default": { "logLevel": "none" } },
+    "extractorMessageReporting": { "default": { "logLevel": "none" } }
+  }
+}
+```
+
+Then:
+1. First emit types to `dist/types`:
+   ```bash
+   npx tsc -p tsconfig.json --declaration --emitDeclarationOnly --declarationDir dist/types
+   ```
+2. Roll them up:
+   ```bash
+   npx api-extractor run
+   ```
 
 ---
 
-## Two quick questions (so I format it the way you want)
-1. Do you want the output as:
-   - **A)** `declare module "@parallel/sdk"` style (recommended for LLM + TS consumers), or
-   - **B)** a global `declare namespace Parallel { ... }` style?
-
-2. Which import specifier should the declaration represent? (e.g. `"parallel-sdk"`, `"@parallel-web/sdk"`, etc.). If you’re not sure, I’ll infer it from `package.json` `name` + `exports`.
+## What I will deliver once you provide source/output
+A single `parallel-sdk.d.ts` that:
+- includes the **entire exported public API footprint**
+- preserves **all doc-comments exactly 1:1** where they exist
+- removes private/internal non-exported noise (unless you want everything)
+- is organized so an LLM can quickly see:
+  - main client(s) / entrypoints
+  - method signatures and request/response types
+  - important enums/unions
+  - errors and config objects
 
 ---
 
-Send me either the `SRC_DUMP.txt` or a zip of the `src/` directory and I’ll generate the single consolidated `.d.ts` immediately.
+## Quick clarification (so I generate the right thing)
+1. Do you want **only the public exports** (recommended) or literally every type in `src/`?
+2. Should the single file be:
+   - a *true* `.d.ts` rollup (TypeScript-valid), or
+   - an *LLM-summary* `.d.ts` (still valid TS) that may re-order/group declarations for readability?
+
+If you paste the generated `parallel-sdk.d.ts` from Option B, I can immediately reshape it into the clean “single-file footprint” version while keeping doc-comments unchanged.
