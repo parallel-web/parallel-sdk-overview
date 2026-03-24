@@ -1,29 +1,35 @@
-I can do this, but I can’t access external URLs from here, so I can’t read the repo contents at that link directly.
+I can do this, but I can’t directly fetch or browse that GitHub/uithub URL from here.
 
-If you paste (or upload) the source tree for `src/parallel/` (or a zip of the repo), I’ll generate a **single consolidated `parallel.pyi`** that mirrors the full public API surface, and I’ll **copy docstrings/comments 1:1** wherever they exist.
+If you paste the repository contents (or a zip) I’ll generate a single consolidated `parallel.pyi` that covers the whole public API and copies docstrings 1:1.
 
-### What I need from you
-Any one of these works:
+### What I need from you (pick one)
+1. **Upload a zip** of `src/parallel/` (preferred), or  
+2. **Paste** the contents of all `.py` files under `src/parallel/`, or  
+3. Provide the files in multiple messages (I’ll tell you when I have enough).
 
-1. **Upload a zip** of the repository (best), or  
-2. Paste the contents of all `.py` files under:
-   - `src/parallel/**/*.py`
-3. If the package uses re-exports, also include:
-   - `src/parallel/__init__.py`
-   - any `py.typed` / typing-related files
-   - `pyproject.toml` (optional, helps determine package name/exports)
+### Quick local command to give me everything as text
+From your repo root, run:
+
+```bash
+python - <<'PY'
+import pathlib
+root = pathlib.Path("src/parallel")
+for p in sorted(root.rglob("*.py")):
+    print("\n" + "="*80)
+    print(str(p))
+    print("="*80)
+    print(p.read_text(encoding="utf-8"))
+PY
+```
+
+Paste the output here.
 
 ### What I will produce
-- A **single file** (e.g., `parallel.pyi`) containing:
-  - all public modules/classes/functions/constants
-  - method signatures, overloads, async defs, properties
-  - exported names as seen from `parallel` top-level (including re-exports)
-  - imports for typing (e.g., `typing`, `typing_extensions`)
-  - **doc-comments/docstrings copied verbatim** (I will not rewrite them)
+- A **single** `.pyi` file (e.g., `parallel_api.pyi`) that:
+  - Includes all exported classes/functions/constants/types.
+  - Preserves **docstrings exactly** (copied 1:1) where present.
+  - Flattens/re-exports key symbols so an LLM can “see” the whole footprint.
+  - Adds `from __future__ import annotations` and uses `typing`/`typing_extensions` as needed.
+  - Uses best-effort signatures based on source (including overloads, TypedDicts, Protocols, generics).
 
-### Quick question (so I output the right “footprint”)
-Should the `.pyi` represent:
-1) **Only what’s publicly exported** from `parallel` (what users import), or  
-2) **Everything under `src/parallel/`**, including internal modules?
-
-Reply with (1) or (2), and upload/paste the code, and I’ll generate the consolidated `.pyi`.
+Send the files (option 1/2/3), and I’ll return the complete `.pyi` in one block.
