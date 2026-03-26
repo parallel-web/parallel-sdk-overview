@@ -1,51 +1,41 @@
-I can do that, but I can’t directly access that URL from here. If you paste the contents of the `src/` tree (or upload a zip), I’ll generate a single consolidated `parallel-sdk.d.ts` that preserves **all existing doc-comments 1:1**.
+I can do that, but I can’t directly fetch that GitHub/Uithub URL from here. If you paste the contents of the `src/` directory (or upload a zip / paste the files), I’ll generate a single consolidated `index.d.ts` that summarizes the public API surface and preserves doc-comments 1:1.
 
-Meanwhile, here are two workable options:
+To make this fast, please provide one of the following:
 
-## Option A (fastest): you export the repo snapshot, I generate the .d.ts
-Run this locally and paste the output here:
-
+1) **Best:** a zip of the repo or just `src/**`  
+2) Paste the output of:
 ```bash
-# 1) clone
 git clone https://github.com/parallel-web/parallel-sdk-typescript.git
 cd parallel-sdk-typescript
-
-# 2) print the src tree files into one pasteable bundle
-python - <<'PY'
-import os
-root="src"
-for dirpath, _, filenames in os.walk(root):
-    for fn in sorted(filenames):
-        if fn.endswith((".ts",".tsx")):
-            path=os.path.join(dirpath,fn)
-            print("\n" + "="*90)
-            print(path)
-            print("="*90)
-            with open(path,"r",encoding="utf-8") as f:
-                print(f.read())
-PY
+tar -czf src.tgz src
 ```
+and upload `src.tgz`
 
-Paste that into chat, and I’ll produce a single `.d.ts` file summarizing the full public API footprint.
-
-## Option B (you generate types locally): I then “flatten” it for LLM use
-If the project builds with TypeScript declarations, you can generate `.d.ts` files:
-
+3) Or paste:
 ```bash
-npm i
-npx tsc -p . --declaration --emitDeclarationOnly --outDir dist-types
+find src -type f -maxdepth 20 -print
 ```
-
-Then either:
-- zip `dist-types/` and upload, or
-- paste the generated `.d.ts` files
-
-…and I’ll merge them into one clean, single-file `parallel-sdk.d.ts`.
+and then paste each file’s contents.
 
 ---
 
-## A couple quick questions (so I match what you want)
-1) Do you want **only the public exports** (what consumers import), or **everything in `src/`** including internal types?
-2) Should the final single `.d.ts` be **flat** (no `declare module`), or wrapped as `declare module "parallel-sdk"` (or the package name in `package.json`)?
+### What I will produce
+- A **single `parallel-sdk.d.ts`** (or `index.d.ts`) that:
+  - Re-exports and inlines types so an LLM can “see” the whole footprint in one file.
+  - Preserves **all existing JSDoc/doc-comments exactly** (copy 1:1).
+  - Includes interfaces/types/classes/functions/enums exported from `src`.
+  - Includes a top-level module shape that matches how the package is intended to be imported (e.g., `import { Parallel } from ...` or `import Parallel from ...`)—I’ll infer this from the entry file (often `src/index.ts`).
 
-Once you provide the `src` contents (or generated d.ts output), I’ll return a single `.d.ts` with doc-comments copied over exactly where possible.
+### A couple quick clarifying questions (optional)
+If you answer these it helps me match the final `.d.ts` to your intended usage:
+
+1) What is the package name used in imports? (e.g. `"@parallel/sdk"` vs `"parallel-sdk"` vs relative)  
+2) Do you want the output as:
+   - **global `declare module "package-name"`** style, or
+   - plain ambient declarations with `export` statements (typical for bundling into `types/`)?
+
+If you don’t care, I’ll default to: **a single file with normal `export` declarations**, mirroring `src/index.ts` exports, plus an optional `declare module "<package-name>"` wrapper if the repo indicates it.
+
+---
+
+Send `src/` and I’ll return the consolidated `.d.ts` in one shot.
