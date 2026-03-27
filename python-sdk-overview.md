@@ -1,46 +1,47 @@
-I can, but I can’t directly access that URL from here. If you paste the contents of the `src/parallel/` package (or upload a zip / paste key files like `__init__.py`, `client.py`, `types.py`, etc.), I’ll generate a single consolidated `parallel.pyi` stub that:
+I can do this, but I can’t access external URLs from here. If you paste the package source (or upload a zip / paste the contents of `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API surface and copies docstrings 1:1.
 
-- Covers the *entire public footprint* (all exported classes/functions/constants, including nested modules)
-- Preserves **docstrings 1:1** wherever they exist (copied verbatim into the `.pyi`)
-- Adds accurate type signatures (including overloads, TypedDicts, dataclasses, enums, protocols, generics where applicable)
+To make this easy, here are two options:
 
-### What I need from you
-Pick one of these:
+## Option A (preferred): upload a zip
+Zip the `src/parallel/` directory and upload it here.
 
-1) **Upload a zip** of `src/parallel/`  
-or  
-2) **Paste the full text** of all `.py` files under `src/parallel/`  
-or (least work)  
-3) Run this locally and paste the output:
+## Option B: paste files
+Paste the full text of all `.py` files under `src/parallel/` (including `__init__.py`).
+
+---
+
+## What I will produce
+- A **single** `.pyi` file representing the **entire public footprint** of the package.
+- `from __future__ import annotations` and appropriate `typing` imports.
+- Re-exported names from `parallel/__init__.py` handled correctly.
+- **Docstrings copied 1:1** wherever they exist in the source (module/class/function docstrings). I won’t rewrite or “fix” them.
+- Types inferred when possible:
+  - function args/returns, `@dataclass` fields, attributes, properties
+  - `TypedDict` / `Protocol` / `Enum` / `Literal` / overloads if present
+- For anything that can’t be inferred safely, I’ll use `Any` (minimizing invention).
+
+---
+
+## Minimal command to send me everything (text)
+If you can run this locally and paste the output:
 
 ```bash
 python - <<'PY'
 import os, pathlib
 root = pathlib.Path("src/parallel")
-for p in sorted(root.rglob("*.py")):
+for path in sorted(root.rglob("*.py")):
     print("\n" + "="*80)
-    print(p.as_posix())
+    print(str(path))
     print("="*80)
-    print(p.read_text(encoding="utf-8"))
+    print(path.read_text(encoding="utf-8"))
 PY
 ```
 
-Once I have the source, I’ll return a **single** `.pyi` file (e.g., `parallel.pyi`) with module-level sections like:
+---
 
-```py
-# parallel/__init__.py
-...
-# parallel/client.py
-...
-# parallel/resources/...
-...
-```
+## One quick question (so I match your intent)
+Should the `.pyi` include:
+1) **Only public API** (names exported via `__all__` / `__init__.py`, and non-underscore symbols), or  
+2) **Everything** (including internal `_` modules/classes/functions)?
 
-### Quick clarification (so I export the “right” surface)
-Should the stub include:
-- Only “public” names (those in `__all__` and/or not prefixed by `_`), **or**
-- Everything (including private helpers)?
-
-If you don’t specify, I’ll default to **public API only**, plus any types referenced by public signatures.
-
-Send the source (option 1/2/3) and your preference (public-only vs everything), and I’ll produce the `.pyi`.
+Reply with (1) or (2) and provide the sources, and I’ll generate the single `.pyi`.

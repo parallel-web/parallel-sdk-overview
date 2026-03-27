@@ -1,41 +1,46 @@
-I can do that, but I can’t directly fetch that GitHub/Uithub URL from here. If you paste the contents of the `src/` directory (or upload a zip / paste the files), I’ll generate a single consolidated `index.d.ts` that summarizes the public API surface and preserves doc-comments 1:1.
+I can, but I can’t directly fetch that GitHub URL from here. If you paste the repository contents (or upload a zip / paste the `src` tree files), I’ll generate a single consolidated `index.d.ts` that summarizes the public API surface, preserving doc-comments 1:1.
 
-To make this fast, please provide one of the following:
+Meanwhile, here’s the exact shape of what I’ll produce once you provide the code, plus two easy ways to get me the inputs.
 
-1) **Best:** a zip of the repo or just `src/**`  
+## What I need from you
+One of:
+
+1) **Upload a zip** of `src/` (best), or  
 2) Paste the output of:
 ```bash
 git clone https://github.com/parallel-web/parallel-sdk-typescript.git
 cd parallel-sdk-typescript
 tar -czf src.tgz src
 ```
-and upload `src.tgz`
+and upload `src.tgz`, or  
+3) Paste file contents for everything under `src/` (ok if not huge).
 
-3) Or paste:
-```bash
-find src -type f -maxdepth 20 -print
+If there are additional exported entrypoints (like `index.ts`, `package.json` `exports`, etc.), include those too so I don’t miss public exports.
+
+## What I will generate (single file)
+I’ll generate **one** `.d.ts` file that:
+
+- Follows the SDK’s **public exports** (barrels like `src/index.ts`, etc.).
+- Includes **all exported types, classes, functions, interfaces, namespaces**, etc.
+- Preserves **doc comments exactly 1:1** where they exist (verbatim).
+- Flattens/re-exports so an LLM can read one file and understand the footprint.
+- Avoids implementation details; it’s declaration-only.
+
+## Output template (the file you’ll get)
+When you provide the code, I’ll return something like:
+
+```ts
+// parallel-sdk.d.ts
+// Auto-consolidated from src/**.ts. Public API footprint summary.
+
+export * from "./<whatever the package exports are>"; // (inlined in final output, not separate files)
+
+// ... all declarations in one file, with doc-comments copied verbatim ...
 ```
-and then paste each file’s contents.
 
----
+## One question (so I match your intent)
+Do you want:
+- **Only the public API** (whatever is exported from the package entrypoints), or
+- **Everything under `src/`** even if not exported?
 
-### What I will produce
-- A **single `parallel-sdk.d.ts`** (or `index.d.ts`) that:
-  - Re-exports and inlines types so an LLM can “see” the whole footprint in one file.
-  - Preserves **all existing JSDoc/doc-comments exactly** (copy 1:1).
-  - Includes interfaces/types/classes/functions/enums exported from `src`.
-  - Includes a top-level module shape that matches how the package is intended to be imported (e.g., `import { Parallel } from ...` or `import Parallel from ...`)—I’ll infer this from the entry file (often `src/index.ts`).
-
-### A couple quick clarifying questions (optional)
-If you answer these it helps me match the final `.d.ts` to your intended usage:
-
-1) What is the package name used in imports? (e.g. `"@parallel/sdk"` vs `"parallel-sdk"` vs relative)  
-2) Do you want the output as:
-   - **global `declare module "package-name"`** style, or
-   - plain ambient declarations with `export` statements (typical for bundling into `types/`)?
-
-If you don’t care, I’ll default to: **a single file with normal `export` declarations**, mirroring `src/index.ts` exports, plus an optional `declare module "<package-name>"` wrapper if the repo indicates it.
-
----
-
-Send `src/` and I’ll return the consolidated `.d.ts` in one shot.
+Reply with (A) public-only or (B) everything, and provide the `src/` contents/zip, and I’ll produce the single consolidated `.d.ts`.
