@@ -1,41 +1,31 @@
-I can do this, but I can’t fetch or browse that GitHub URL from here. If you paste the contents of the `src/` directory (or upload a zip / tarball, or paste the `index.ts` exports + all referenced files), I’ll generate a single consolidated `parallel-sdk.d.ts` that:
+I can do that, but I can’t directly fetch or browse that GitHub URL from here. If you paste the contents of `src/` (or upload a zip / the files), I’ll generate a single consolidated `parallel-sdk.d.ts` that:
 
-- flattens the public surface area (everything exported from the package entrypoints),
-- preserves **doc-comments 1:1** (copied verbatim, no edits),
-- resolves re-exports into one file,
-- keeps types/interfaces/classes/functions organized by namespace/module.
+- Re-exports the public surface area (classes, functions, types, interfaces, namespaces)
+- Preserves doc-comments **verbatim (1:1)** wherever present
+- Flattens/merges modules into one file in a way that is easy for an LLM to read
+- Keeps names identical to the original SDK types
 
 ### What I need from you
-Pick one option:
+Pick one:
 
-1) **Upload** the repository (or just `src/`) as an attachment here, or  
+1) **Upload** the repository (or just the `src/` folder) here, or  
 2) Paste:
-   - `package.json`
-   - `src/index.ts` (or whatever the entry file is)
-   - all files that are exported (directly or indirectly) from that entry.
+   - `src/index.ts` (or whatever the entrypoint is)
+   - any exported files it references (recursively)
+   - `package.json` (helps determine the main entry and exports)
 
 ### Quick way to provide it
-From the repo root, run:
+Run this from the repo root and paste the output file contents here:
 
 ```bash
-tar -czf parallel-src.tgz src package.json tsconfig.json
+# mac/linux
+find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print0 | xargs -0 -I {} sh -c 'echo "\n\n//// FILE: {}\n"; cat "{}"' > /tmp/parallel-src-dump.txt
 ```
 
-and upload `parallel-src.tgz` here.
+Then paste `/tmp/parallel-src-dump.txt` into chat (or upload it).
 
-### Output format (what you’ll get)
-A single file like:
+### A couple of clarifying questions (optional)
+1) Do you want the `.d.ts` to reflect **only public exports** (recommended), or **everything in src**?
+2) Should I include **runtime value exports** (classes/functions) as `declare` (yes, typical), or produce a “types-only” file?
 
-```ts
-// parallel-sdk.d.ts
-declare module "parallel-sdk" {
-  /** (doc comments preserved 1:1) */
-  export class ParallelClient { ... }
-
-  export interface Foo { ... }
-  export type Bar = ...
-  export function baz(...): ...
-}
-```
-
-If you upload/paste the source, I’ll produce the `.d.ts` in the next message.
+Once you provide the code, I’ll return a single `.d.ts` file as requested.
