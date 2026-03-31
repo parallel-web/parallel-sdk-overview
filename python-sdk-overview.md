@@ -1,39 +1,66 @@
-I can do this, but I can’t directly access that URL from here. If you paste the repository contents (or upload a zip / paste the `src/parallel` package tree files), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API surface and copies docstrings 1:1.
+I can do that, but I can’t access external URLs from here, including uithub/GitHub links. If you paste the repository contents (or upload a zip / paste the files under `src/parallel/**`), I’ll generate a single consolidated `.pyi` stub that summarizes the full public API footprint and will copy docstrings/comments 1:1 where present.
 
-To make this easy, pick one of these:
+To make this easy, please provide one of the following:
 
 ## Option A (best): upload an archive
-1. Download the repo / package.
-2. Upload a `.zip` containing `src/parallel/**`.
+Upload a `.zip` of the repo (or at least `src/parallel/`). I’ll parse it and return `parallel_sdk.pyi` (or whatever name you prefer).
 
 ## Option B: paste file tree + file contents
 Paste:
-- the output of `find src/parallel -type f -maxdepth 10`
-- and then the contents of each `.py` file.
+1) The output of `find src/parallel -type f -maxdepth 20` (or equivalent on Windows), and  
+2) The contents of each `.py` file under `src/parallel/`.
 
-## Option C: run a script locally to extract the package for me
-Run this in the repo root and paste the generated `parallel__dump.txt`:
+## Option C: minimal command to generate a bundle you paste
+If you can run a command locally, this produces a single text bundle of all python sources:
 
+### macOS/Linux
 ```bash
 python - <<'PY'
-import os, pathlib
-root = pathlib.Path("src/parallel")
-out = []
-for path in sorted(root.rglob("*.py")):
-    out.append(f"\n# ==== {path.as_posix()} ====\n")
-    out.append(path.read_text(encoding="utf-8"))
-pathlib.Path("parallel__dump.txt").write_text("".join(out), encoding="utf-8")
-print("Wrote parallel__dump.txt")
+import os
+root="src/parallel"
+for dirpath, _, filenames in os.walk(root):
+    for fn in sorted(filenames):
+        if fn.endswith(".py"):
+            path=os.path.join(dirpath, fn)
+            print("\n" + "="*80)
+            print(path)
+            print("="*80)
+            with open(path, "r", encoding="utf-8") as f:
+                print(f.read())
 PY
 ```
 
-Then I will return:
-- a single `parallel.pyi` covering the whole package footprint (modules, classes, functions, constants, exports)
-- preserving docstrings/comments exactly where present (copied 1:1)
-- with imports/forward refs arranged so type checkers/LLMs can understand structure
+### Windows PowerShell
+```powershell
+python - <<'PY'
+import os
+root=r"src/parallel"
+for dirpath, _, filenames in os.walk(root):
+    for fn in sorted(filenames):
+        if fn.endswith(".py"):
+            path=os.path.join(dirpath, fn)
+            print("\n" + "="*80)
+            print(path)
+            print("="*80)
+            print(open(path, "r", encoding="utf-8").read())
+PY
+```
 
-### Two quick preferences
-1. Should the `.pyi` reflect **only the public API** (i.e., what’s exported via `__all__` / non-underscore names), or **everything** including private/underscore members?
-2. Target typing level: minimal signatures vs. best-effort (inferring types from annotations where available, otherwise using `Any`)?
+---
 
-Send the files (or the dump) and your two preferences, and I’ll produce the single `.pyi`.
+## What I will produce
+A single `.pyi` file that:
+- Includes all public classes/functions/constants, including method signatures
+- Includes imports/types needed for readability (e.g., `TypedDict`, `Protocol`, `Literal`, etc.)
+- Preserves docstrings exactly **1:1** (triple-quoted where appropriate) for modules/classes/functions/methods whenever present
+- Marks unknown/complex return types conservatively as `Any`
+- Includes overloads if present in the code (or inferrable without guessing)
+- Avoids implementation; it’s a pure stub file
+
+---
+
+## Two quick clarifying questions (optional)
+1) Should the stub reflect **only the public API** (exports via `__init__.py`, or names not prefixed with `_`), or **everything** in `src/parallel/`?
+2) What Python typing target do you want? (`py3.9`, `py3.10`, `py3.11+` affects `typing.Self`, `Required/NotRequired`, etc.)
+
+Send the code (Option A/B/C) and I’ll generate the single `.pyi` in one response.
