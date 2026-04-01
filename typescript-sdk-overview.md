@@ -1,52 +1,81 @@
-I can do that, but I can’t access external URLs directly from here, including `uithub.com`. If you paste the contents of the `src/` directory (or upload a zip / paste key files), I’ll generate a single consolidated `index.d.ts` that summarizes the API footprint and I’ll copy doc-comments over **1:1** exactly as they appear.
+I can, but I can’t fetch that repository content from the link directly in this chat. If you paste (or upload) the `src` tree contents (or a zip), I’ll generate a single consolidated `index.d.ts` that mirrors the public API and copies doc-comments **1:1**.
 
-To make this fast, choose one of these:
+In the meantime, here are two practical options:
 
-## Option A (best): upload a zip
-Upload a zip of `src/` here. I’ll return one `.d.ts` file.
+## Option A (fastest): You paste files here
+1. Copy/paste all `src/**/*.ts` (or at least all exported/public modules) into this chat.
+2. Tell me the intended entrypoint (e.g. `src/index.ts`), if any.
+3. I’ll return a single `.d.ts` file.
 
-## Option B: paste file contents
-Paste the contents of all `.ts` files under `src/` (or at least all exported/public ones, plus any types they depend on).
+## Option B (you run a script): Auto-generate a single `.d.ts` bundle
+If you can run commands locally, this will produce a **single** `api-footprint.d.ts` from the package exports.
 
-## Option C: run a script locally and paste output
-From the repo root, run:
+### 1) Ensure TypeScript config supports declarations
+Create/adjust `tsconfig.json` (or a separate `tsconfig.build.json`) like:
 
-```bash
-# list files
-find src -type f -name "*.ts" -print
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "stripInternal": false,
+    "outDir": "dist-types",
+    "rootDir": "src",
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"]
+}
 ```
 
-Then either paste them, or generate a single combined view:
-
+### 2) Generate .d.ts files
 ```bash
-# naive concatenation (good enough for me to reconstruct a .d.ts)
-for f in $(find src -type f -name "*.ts" | sort); do
-  echo "//// FILE: $f"
-  cat "$f"
-  echo
-done > /tmp/parallel-src.txt
-
-# then paste /tmp/parallel-src.txt here
+npm i
+npx tsc -p tsconfig.json
 ```
+
+### 3) Bundle into one file (recommended: API Extractor)
+```bash
+npm i -D @microsoft/api-extractor
+npx api-extractor init
+```
+
+Then edit `api-extractor.json` to point at your entry d.ts (commonly `dist-types/index.d.ts`):
+
+```json
+{
+  "mainEntryPointFilePath": "<projectFolder>/dist-types/index.d.ts",
+  "dtsRollup": {
+    "enabled": true,
+    "untrimmedFilePath": "<projectFolder>/api-footprint.d.ts"
+  },
+  "docModel": { "enabled": false },
+  "apiReport": { "enabled": false }
+}
+```
+
+Run:
+```bash
+npx api-extractor run
+```
+
+This will preserve doc comments as emitted by TypeScript (and usually keeps JSDoc intact). If you want me to ensure comments are copied 1:1 from source, I can do that too—but I’ll need the source text to verify.
 
 ---
 
-## What I will produce
-- A **single** `.d.ts` file (e.g. `parallel-sdk.d.ts`) that:
-  - Preserves the module/public surface (exports, namespaces if any)
-  - Includes interfaces/types/classes/functions/constants
-  - Includes doc-comments **verbatim** (copied 1:1) wherever they exist
-  - Inlines or references internal types as needed so the file is usable as an API “map” for an LLM
-  - Avoids implementation; types only
+## What I need from you to produce the exact single `.d.ts`
+Please provide one of the following:
 
-## Quick clarification (so I match your intent)
-Do you want the output as:
-1) **One ambient module** (e.g. `declare module "parallel-sdk"`), or  
-2) **Pure global declarations** (rare), or  
-3) **ESM-style exports** in a `.d.ts` (typical: `export *`, `export interface`, etc.)?
+1. A zip of the `src/` folder, or  
+2. The text of all files under `src/`, or  
+3. The generated `dist-types/**/*.d.ts` plus the entrypoint (e.g. `dist-types/index.d.ts`), and I’ll roll it up into one.
 
-If you don’t care, I’ll default to **ESM-style** matching the repo’s public entrypoints.
+Also tell me:
+- Which module should be treated as the public entrypoint (`src/index.ts`? something else?).
+- Whether you want **only public exports** (recommended) or literally everything in `src/`.
 
----
-
-Send the `src/` contents (zip or pasted), and I’ll generate the single `.d.ts`.
+Once you share the code, I’ll output a single `.d.ts` file in one block, with doc-comments copied over exactly.

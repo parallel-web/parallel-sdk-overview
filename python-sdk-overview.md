@@ -1,66 +1,23 @@
-I can do that, but I can’t access external URLs from here, including uithub/GitHub links. If you paste the repository contents (or upload a zip / paste the files under `src/parallel/**`), I’ll generate a single consolidated `.pyi` stub that summarizes the full public API footprint and will copy docstrings/comments 1:1 where present.
+I can do that, but I can’t directly access `uithub.com` (or any external URL) from here. If you paste the repository contents (or upload a zip / the `src/parallel` directory), I’ll generate a single consolidated `parallel.pyi` that summarizes the public API footprint and copies docstrings 1:1.
 
-To make this easy, please provide one of the following:
+To make this fast, please provide one of:
 
-## Option A (best): upload an archive
-Upload a `.zip` of the repo (or at least `src/parallel/`). I’ll parse it and return `parallel_sdk.pyi` (or whatever name you prefer).
+1. **Zip upload** of the repo (or just `src/parallel/`), or  
+2. Paste the output of:
+   - `tree -a src/parallel`  
+   - and the contents of all `.py` files under `src/parallel` (you can paste in multiple messages), or  
+3. Paste a GitHub tarball link **and** the files’ contents (since I can’t fetch).
 
-## Option B: paste file tree + file contents
-Paste:
-1) The output of `find src/parallel -type f -maxdepth 20` (or equivalent on Windows), and  
-2) The contents of each `.py` file under `src/parallel/`.
+### What I will produce
+- A **single** `parallel.pyi` file that:
+  - Exposes the **public surface area** (classes, functions, constants, exceptions, typed attrs, `__all__`, etc.).
+  - Includes **doc-comments/docstrings copied verbatim** (no edits).
+  - Preserves module structure via section headers like `# ---- parallel.client ----` while still being one file.
+  - Uses `typing` constructs (`Protocol`, `TypedDict`, overloads, generics) where needed to reflect behavior.
+  - Re-exports symbols as the package does (so an LLM sees “how to use it”).
 
-## Option C: minimal command to generate a bundle you paste
-If you can run a command locally, this produces a single text bundle of all python sources:
+### A couple of clarifying questions (optional)
+1. Do you want **only public API** (recommended), or **everything including internal/private** names?
+2. Should I target **Python 3.8+** typing or **3.11+** (affects `Self`, `typing.NotRequired`, etc.)?
 
-### macOS/Linux
-```bash
-python - <<'PY'
-import os
-root="src/parallel"
-for dirpath, _, filenames in os.walk(root):
-    for fn in sorted(filenames):
-        if fn.endswith(".py"):
-            path=os.path.join(dirpath, fn)
-            print("\n" + "="*80)
-            print(path)
-            print("="*80)
-            with open(path, "r", encoding="utf-8") as f:
-                print(f.read())
-PY
-```
-
-### Windows PowerShell
-```powershell
-python - <<'PY'
-import os
-root=r"src/parallel"
-for dirpath, _, filenames in os.walk(root):
-    for fn in sorted(filenames):
-        if fn.endswith(".py"):
-            path=os.path.join(dirpath, fn)
-            print("\n" + "="*80)
-            print(path)
-            print("="*80)
-            print(open(path, "r", encoding="utf-8").read())
-PY
-```
-
----
-
-## What I will produce
-A single `.pyi` file that:
-- Includes all public classes/functions/constants, including method signatures
-- Includes imports/types needed for readability (e.g., `TypedDict`, `Protocol`, `Literal`, etc.)
-- Preserves docstrings exactly **1:1** (triple-quoted where appropriate) for modules/classes/functions/methods whenever present
-- Marks unknown/complex return types conservatively as `Any`
-- Includes overloads if present in the code (or inferrable without guessing)
-- Avoids implementation; it’s a pure stub file
-
----
-
-## Two quick clarifying questions (optional)
-1) Should the stub reflect **only the public API** (exports via `__init__.py`, or names not prefixed with `_`), or **everything** in `src/parallel/`?
-2) What Python typing target do you want? (`py3.9`, `py3.10`, `py3.11+` affects `typing.Self`, `Required/NotRequired`, etc.)
-
-Send the code (Option A/B/C) and I’ll generate the single `.pyi` in one response.
+Once you paste/upload the code, I’ll return the complete `.pyi` in one message.
