@@ -1,23 +1,39 @@
-I can do that, but I can’t directly access `uithub.com` (or any external URL) from here. If you paste the repository contents (or upload a zip / the `src/parallel` directory), I’ll generate a single consolidated `parallel.pyi` that summarizes the public API footprint and copies docstrings 1:1.
+I can, but I can’t directly fetch or browse that URL from here. If you paste the contents of the package (or upload a zip of `src/parallel/`), I’ll generate a single aggregated `parallel.pyi` that covers the whole public API surface and preserves docstrings 1:1.
 
-To make this fast, please provide one of:
+To make this easy, please provide **one** of the following:
 
-1. **Zip upload** of the repo (or just `src/parallel/`), or  
-2. Paste the output of:
-   - `tree -a src/parallel`  
-   - and the contents of all `.py` files under `src/parallel` (you can paste in multiple messages), or  
-3. Paste a GitHub tarball link **and** the files’ contents (since I can’t fetch).
+### Option A (best): upload a zip
+Zip `src/parallel/` and upload it here.
 
-### What I will produce
-- A **single** `parallel.pyi` file that:
-  - Exposes the **public surface area** (classes, functions, constants, exceptions, typed attrs, `__all__`, etc.).
-  - Includes **doc-comments/docstrings copied verbatim** (no edits).
-  - Preserves module structure via section headers like `# ---- parallel.client ----` while still being one file.
-  - Uses `typing` constructs (`Protocol`, `TypedDict`, overloads, generics) where needed to reflect behavior.
-  - Re-exports symbols as the package does (so an LLM sees “how to use it”).
+### Option B: paste a tree + files
+Run this locally and paste the output:
 
-### A couple of clarifying questions (optional)
-1. Do you want **only public API** (recommended), or **everything including internal/private** names?
-2. Should I target **Python 3.8+** typing or **3.11+** (affects `Self`, `typing.NotRequired`, etc.)?
+```bash
+python - <<'PY'
+import os, pathlib
+root = pathlib.Path("src/parallel")
+for p in sorted(root.rglob("*.py")):
+    print("\n# === FILE:", p.as_posix(), "===\n")
+    print(p.read_text(encoding="utf-8"))
+PY
+```
 
-Once you paste/upload the code, I’ll return the complete `.pyi` in one message.
+---
+
+## What you’ll get
+- A **single** `.pyi` file (e.g. `parallel_api.pyi`) containing:
+  - all exported classes/functions/constants/types
+  - method signatures (including overloads if needed)
+  - re-exports from `__init__.py`
+  - `TypedDict`/`Protocol`/`Enum` where applicable
+  - **doc-comments copied 1:1** (docstrings preserved verbatim; I’ll place them in the stub right under the symbol they document)
+
+---
+
+## A couple of quick preferences (optional)
+Reply with any preferences; otherwise I’ll choose sensible defaults:
+1. Target typing: `py>=3.9` or `py>=3.11`?
+2. Include *private* members (leading `_`), or only public API?
+3. Prefer exposing `__all__`-based exports if present? (default: yes)
+
+Once you paste/upload the code, I’ll return the complete `.pyi` in one block.
