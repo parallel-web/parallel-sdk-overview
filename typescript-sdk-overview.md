@@ -1,49 +1,43 @@
-I can do that, but I can’t fetch that GitHub URL from here directly. If you paste the contents of `src/` (or upload a zip), I’ll generate a single consolidated `index.d.ts` that reflects the public API surface and I’ll copy doc-comments over **1:1**.
+I can, but I can’t directly fetch that GitHub URL from here. If you paste the contents of the `src/` files (or upload a zip / provide a single concatenated dump), I’ll generate a single consolidated `.d.ts` that mirrors the public API surface and **copies doc-comments 1:1**.
 
-In the meantime, here are two ways to get me the inputs efficiently, plus the exact output format I’ll produce.
+In the meantime, here are two fast ways to get me exactly what I need, plus the exact output format I’ll produce.
 
-## Option A (best): upload a zip
-1. Download the repo (or just `src/`) as a zip.
-2. Upload it here.
-3. Tell me if you want:
-   - only *public* exports (recommended), or
-   - literally everything in `src/`.
-
-## Option B: paste a tarball of text (no binaries)
-Run this locally from the repo root and paste the output:
+## Option A (best): paste one combined dump
+From the repo root:
 
 ```bash
-python - <<'PY'
-import os
-root="src"
-for dirpath, _, filenames in os.walk(root):
-    for fn in sorted(filenames):
-        if fn.endswith((".ts",".tsx")) and not fn.endswith(".d.ts"):
-            path=os.path.join(dirpath, fn)
-            print("\n" + "="*80)
-            print(path)
-            print("="*80)
-            with open(path,"r",encoding="utf-8") as f:
-                print(f.read())
-PY
+git clone https://github.com/parallel-web/parallel-sdk-typescript.git
+cd parallel-sdk-typescript
+find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print0 | sort -z | xargs -0 -I{} sh -c 'echo "\n\n// FILE: {}"; sed -n "1,2000p" "{}"' > /tmp/parallel-src-dump.txt
 ```
 
-## What I will generate
-A single `.d.ts` file that:
-- follows the package’s entrypoints (`src/index.ts`, `src/mod.ts`, etc.) to mirror what users can import
-- inlines all exported types/interfaces/classes/functions
-- preserves JSDoc/doc-comments **exactly as written** (1:1, no edits)
-- resolves and flattens `export * from ...` chains into one file
-- keeps namespaces/modules only if your package uses them intentionally
-- avoids implementation bodies (declaration-only)
+Then paste `/tmp/parallel-src-dump.txt` here (or upload it).
 
-If you want, I can also produce **two** files:
-1) `public-api.d.ts` (only symbols reachable from the main entry export)
-2) `full-src.d.ts` (everything in `src/` whether exported or not)
+## Option B: upload the folder as a zip
+Zip `src/` and upload it here.
 
-## Quick questions (so I match your intent)
-1) What is the actual entry file consumers use? (`src/index.ts`? `src/main.ts`? something else?)
-2) Should I include internal/unexported types that are referenced by exported types (usually yes, as `type`/`interface`), but not everything else?
-3) Do you want Node/DOM lib types assumed, or should I explicitly `import` types like `RequestInit`, `Headers`, etc. if used?
+---
 
-Send the `src/` contents (zip or paste) and I’ll return the single consolidated `.d.ts` in the next message.
+## What I will produce
+A single file, e.g. `parallel-sdk.d.ts`, that:
+
+- Exposes the **public** API footprint (exported types, interfaces, classes, functions, namespaces, enums).
+- Preserves **JSDoc doc-comments exactly** (copied 1:1, no edits).
+- Uses `export` declarations matching the library structure.
+- Flattens/re-exports as needed so an LLM can “see” the whole surface area in one file.
+- Avoids implementation bodies (declaration-only).
+
+If you also want the file to reflect the actual package entrypoints, tell me:
+- the `package.json` `main`/`module`/`types` fields, and
+- which exports are intended to be public (if some `src` exports are internal).
+
+---
+
+## One question before I generate it
+Do you want the `.d.ts` to be:
+1) **Single-module** (everything under `declare module "parallel-sdk"`), or  
+2) **Path-accurate** (multiple `declare module "parallel-sdk/..."` sections that mirror the repo’s import paths), but still in one physical file?
+
+Reply with:
+- the dumped source (or zip), and
+- your choice: `single-module` or `path-accurate`.
