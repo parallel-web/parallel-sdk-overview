@@ -1,37 +1,49 @@
-I can do that, but I can’t directly access that URL from here. If you paste the package source (or upload a zip / the `src/parallel` folder contents), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API footprint and copies docstrings 1:1.
+I can do this, but I can’t directly fetch that URL from here. If you paste the repository contents (or upload a zip / the `src/parallel` folder), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API and copies docstrings 1:1.
 
-If you want to do it with minimal back-and-forth, here are two easy options:
+To make this easy, please do one of the following:
 
-## Option A (best): upload the code
-Upload the `src/parallel` directory (or the whole repo) here. Then I’ll produce the `.pyi`.
+## Option A (best): upload a zip
+Upload a zip of `src/parallel/` (or the whole repo).
 
-## Option B: paste a tarball as text
-From your repo root, run:
-
+## Option B: paste file tree + files
+Paste the output of:
 ```bash
-tar -czf parallel-src.tgz src/parallel
-base64 parallel-src.tgz > parallel-src.tgz.b64
+python -c "import os; 
+root='src/parallel'; 
+for d,_,fs in os.walk(root):
+  for f in fs:
+    if f.endswith('.py'):
+      print(os.path.join(d,f))"
+```
+Then paste the contents of each `.py` file.
+
+## Option C: run a script locally to extract everything
+Run this and paste the generated `parallel_all_py.txt` here:
+```bash
+python - <<'PY'
+import os, pathlib
+root = pathlib.Path("src/parallel")
+out = []
+for p in sorted(root.rglob("*.py")):
+    out.append(f"\n# ==== {p.as_posix()} ====\n")
+    out.append(p.read_text(encoding="utf-8"))
+pathlib.Path("parallel_all_py.txt").write_text("".join(out), encoding="utf-8")
+print("Wrote parallel_all_py.txt")
+PY
 ```
 
-Then paste the contents of `parallel-src.tgz.b64` here (it may be long, but it works), and I’ll decode and generate the `.pyi`.
-
 ---
 
-## What I will generate
-A **single** `.pyi` file that:
+## What I will produce
+A single `parallel.pyi` file that:
 
-- Includes all public classes/functions/constants/types exported by `src/parallel`
-- Preserves **docstrings 1:1** (triple-quoted) where present
-- Resolves re-exports (`__init__.py` exports, etc.) so an LLM can “see” the API surface
-- Adds imports from `typing` as needed
-- Uses `typing_extensions` for newer typing constructs if used by the project
-- Keeps internal/private members (leading underscore) out unless they’re part of the public API
+- Aggregates the **public footprint** of the package (modules, classes, functions, constants, exceptions, TypedDicts, protocols, overloads, etc.).
+- Preserves **docstrings exactly** (1:1) wherever they appear on public objects (module/class/function docstrings).
+- Adds imports and forward references as needed to keep the stub valid.
+- Avoids implementation bodies (uses `...`) per `.pyi` conventions.
 
----
+If you want, tell me also:
+1) the target Python version (3.9/3.10/3.11/3.12), and  
+2) whether to include “private” names (`_foo`) or only exported/public API.
 
-## One quick question (so I match your intent)
-Do you want the `.pyi` to represent:
-1) **Only what’s publicly importable** from `parallel` (recommended), or  
-2) **Everything in the package**, including “internal” modules/classes?
-
-Reply with **1 or 2**, and provide the code (upload/paste).
+Send the code (via one of the options above) and I’ll return the complete `.pyi` in one block.
