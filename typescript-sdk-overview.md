@@ -1,38 +1,52 @@
-I can, but I can’t directly fetch that GitHub URL from here. If you paste the contents of `src/` (or upload a zip / list of files), I’ll generate a single flattened `.d.ts` that summarizes the public API and will **copy doc-comments 1:1**.
+I can do that, but I can’t access external URLs directly from here, so I can’t read the repo contents at that link.
 
-In the meantime, here are two ways to get it done immediately:
+If you paste (or upload) the TypeScript source files from `src/` (or a zip of the folder), I’ll generate a single consolidated `parallel-sdk.d.ts` that:
 
-## Option A (fastest): you paste the code
-1. Download the repo locally.
-2. Paste:
-   - `src/index.ts` (or the main entry)
-   - plus any `src/**/*.ts` it exports publicly
+- includes the full public API surface (“footprint”) across the SDK,
+- preserves **doc-comments 1:1** wherever they appear (copied verbatim, no edits),
+- organizes exports so an LLM can understand how to use the API.
 
-Then I’ll return one consolidated `.d.ts`.
+### Fastest ways to provide the source
 
-## Option B: generate locally via TypeScript and I’ll refine/flatten
-Run this in the repo (from the package root):
+#### Option A: Upload a zip
+Zip the `src/` directory and upload it here.
 
-```bash
-npm i
-npx tsc -p . --declaration --emitDeclarationOnly --outDir __types
-```
+#### Option B: Paste a tarball / zip as text (if you can’t upload)
+Not ideal, but workable.
 
-Then locate the generated `__types` entry declaration (often `__types/src/index.d.ts` or similar). If it produces multiple `.d.ts` files, you can either:
-- upload/paste them all, or
-- run a bundler:
+#### Option C: Paste concatenated files
+If small enough, paste all files under `src/` in one message.
+
+#### Option D: Generate a single bundle locally and paste it
+From the repo root, run:
 
 ```bash
-npx dts-bundle-generator -o parallel-sdk-footprint.d.ts src/index.ts
+# prints all TS files in src in a deterministic order
+python - <<'PY'
+import os
+root="src"
+paths=[]
+for d,_,fs in os.walk(root):
+    for f in fs:
+        if f.endswith((".ts",".tsx")) and not f.endswith(".d.ts"):
+            paths.append(os.path.join(d,f))
+for p in sorted(paths):
+    print("\n" + "="*80)
+    print(p)
+    print("="*80)
+    with open(p,"r",encoding="utf-8") as fh:
+        print(fh.read())
+PY
 ```
 
-Then paste `parallel-sdk-footprint.d.ts` here and tell me if you want:
-- **(1)** “as-is” (just bundled), or
-- **(2)** “LLM-friendly footprint” (still correct types, but with simplified re-exports / grouped namespaces), while preserving doc comments exactly.
+Paste the output here.
 
-## A couple of quick questions (so the output matches what you want)
-1. What is the public entrypoint? (`src/index.ts`? something else?)
-2. Do you want **only exported/public symbols**, or literally everything in `src/`?
-3. Should I preserve module specifiers (e.g., `declare module "@parallel/sdk"`), or output as a global `.d.ts` with `export` statements?
+---
 
-If you paste the `src/` tree (or the generated declarations), I’ll produce the single `.d.ts` in one response.
+### One question before I generate the `.d.ts`
+Do you want the `.d.ts` to reflect:
+
+1) **Only the public exports** (what a consumer can import from the package), or  
+2) **Everything under `src/`** (including internal modules)?
+
+If you’re not sure, I’ll default to **public exports only**, inferred from `src/index.ts` (or equivalent barrel files).
