@@ -1,52 +1,45 @@
-I can do that, but I can’t access external URLs directly from here, so I can’t read the repo contents at that link.
+I can do that, but I can’t directly fetch or browse that GitHub URL from here.
 
-If you paste (or upload) the TypeScript source files from `src/` (or a zip of the folder), I’ll generate a single consolidated `parallel-sdk.d.ts` that:
+If you paste the contents of the `src/` directory (or upload a zip / tar of it), I’ll generate a single consolidated `index.d.ts` that:
 
-- includes the full public API surface (“footprint”) across the SDK,
-- preserves **doc-comments 1:1** wherever they appear (copied verbatim, no edits),
-- organizes exports so an LLM can understand how to use the API.
+- summarizes the public API footprint (exports, classes, functions, types)
+- preserves doc-comments **1:1** wherever present (no edits)
+- re-exports modules into one file so an LLM can understand usage from a single artifact
 
-### Fastest ways to provide the source
+### What I need from you (pick one)
 
-#### Option A: Upload a zip
-Zip the `src/` directory and upload it here.
+**Option A (best): upload files**
+- Upload the repository folder or a zip containing `src/**` (and `package.json` if available).
 
-#### Option B: Paste a tarball / zip as text (if you can’t upload)
-Not ideal, but workable.
+**Option B: paste file tree + contents**
+1) Paste the `src/` tree (paths)
+2) Paste each TypeScript file content in code blocks with the path as a header, e.g.
+```text
+// src/index.ts
+...content...
+```
 
-#### Option C: Paste concatenated files
-If small enough, paste all files under `src/` in one message.
-
-#### Option D: Generate a single bundle locally and paste it
-From the repo root, run:
+**Option C: run a command locally and paste output**
+If you can run this locally, it will print everything under `src` in one pasteable stream:
 
 ```bash
-# prints all TS files in src in a deterministic order
 python - <<'PY'
 import os
 root="src"
-paths=[]
-for d,_,fs in os.walk(root):
-    for f in fs:
-        if f.endswith((".ts",".tsx")) and not f.endswith(".d.ts"):
-            paths.append(os.path.join(d,f))
-for p in sorted(paths):
-    print("\n" + "="*80)
-    print(p)
-    print("="*80)
-    with open(p,"r",encoding="utf-8") as fh:
-        print(fh.read())
+for dirpath, _, filenames in os.walk(root):
+    for fn in sorted(filenames):
+        if fn.endswith((".ts",".tsx")) and not fn.endswith(".d.ts"):
+            path=os.path.join(dirpath,fn)
+            print("\n" + "="*80)
+            print(path)
+            print("="*80)
+            with open(path,"r",encoding="utf-8") as f:
+                print(f.read())
 PY
 ```
 
-Paste the output here.
+### A couple of quick preferences (tell me yes/no)
+1) Do you want the `.d.ts` to reflect only **public exports** (recommended), or **everything** in `src` (including internal/non-exported)?
+2) Should I include the runtime entrypoints (`index.ts`) exactly as exported, or also “flatten” and re-export nested modules for easier LLM scanning?
 
----
-
-### One question before I generate the `.d.ts`
-Do you want the `.d.ts` to reflect:
-
-1) **Only the public exports** (what a consumer can import from the package), or  
-2) **Everything under `src/`** (including internal modules)?
-
-If you’re not sure, I’ll default to **public exports only**, inferred from `src/index.ts` (or equivalent barrel files).
+Once you provide the `src` contents, I’ll reply with a single `.d.ts` file in one code block.
