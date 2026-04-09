@@ -1,28 +1,29 @@
-I can do this, but I can’t directly fetch that URL from within this chat session.
+I can do this, but I can’t directly fetch that GitHub/uithub URL from here. If you paste (or upload) the contents of the package (the `src/parallel/` directory: all `.py` files), I’ll generate a single consolidated `parallel.pyi` that:
 
-If you paste (or upload) the contents of the package directory `src/parallel/` (all `.py` files), I’ll generate a single consolidated `parallel.pyi` that reflects the public API surface. I’ll also copy docstrings over **verbatim (1:1)** wherever they appear.
+- exports the full public surface (modules/classes/functions/constants)
+- preserves signatures and types as best as possible
+- copies docstrings **1:1** where present (no edits)
+- includes re-exports from `__init__.py`
+- uses `typing`/`typing_extensions` as needed
 
-To make this easy, please provide one of the following:
+### What I need from you
+Either:
+1) Upload a zip of `src/parallel/`, or  
+2) Paste the contents of all files under `src/parallel/` (including `__init__.py`), or  
+3) If you can’t share everything, at minimum share:
+   - `src/parallel/__init__.py`
+   - all modules imported/re-exported by `__init__.py`
+   - anything under `src/parallel/types*`, `models*`, `client*`, etc.
 
-1) **A zip** of `src/parallel/`, or  
-2) The output of:
-```bash
-python -c "import pathlib; p=pathlib.Path('src/parallel'); 
-print('\n'.join(str(x) for x in p.rglob('*.py')))"
-```
-and then paste each file’s contents, or  
-3) A single tarball text dump (works well):
-```bash
-tar -czf parallel-src.tgz -C src parallel
-```
+### Output format
+I’ll return a single file named something like:
 
-Once I have the code, I will:
-- Build a **single** `.pyi` file (one module stub) that includes:
-  - all public classes/functions/constants/types
-  - `__all__` if present
-  - signatures (including overloads where present)
-  - imported/re-exported names where relevant
-- Preserve docstrings exactly (no edits), placed under the corresponding stubs.
-- Add minimal typing where missing only if needed to make the stub coherent (but I’ll avoid inventing undocumented APIs).
+- `parallel.pyi` (flat, consolidated), or if you prefer:
+- `parallel/__init__.pyi` (package-style stub)
 
-Send the files and tell me the preferred output module name/path (e.g., `parallel.pyi` at repo root vs `src/parallel.pyi`).
+Tell me which you want.
+
+### One quick question
+Do you want the stub to include **all internal modules** too, or only the **public API** (what’s reachable from `import parallel` / documented entrypoints)?
+
+Once you provide the code, I’ll produce the `.pyi` in one shot.

@@ -1,45 +1,34 @@
-I can do that, but I can’t directly fetch or browse that GitHub URL from here.
+I can do that, but I can’t access external URLs directly from here. If you paste the contents of that `src/` directory (or upload a zip / paste key files), I’ll generate a single consolidated `index.d.ts` that summarizes the full public API surface and preserves doc-comments **verbatim**.
 
-If you paste the contents of the `src/` directory (or upload a zip / tar of it), I’ll generate a single consolidated `index.d.ts` that:
+### What I need from you
+Pick one:
 
-- summarizes the public API footprint (exports, classes, functions, types)
-- preserves doc-comments **1:1** wherever present (no edits)
-- re-exports modules into one file so an LLM can understand usage from a single artifact
-
-### What I need from you (pick one)
-
-**Option A (best): upload files**
-- Upload the repository folder or a zip containing `src/**` (and `package.json` if available).
-
-**Option B: paste file tree + contents**
-1) Paste the `src/` tree (paths)
-2) Paste each TypeScript file content in code blocks with the path as a header, e.g.
-```text
-// src/index.ts
-...content...
-```
-
-**Option C: run a command locally and paste output**
-If you can run this locally, it will print everything under `src` in one pasteable stream:
+1. **Upload** a zip of `src/`, or  
+2. Paste the files (you can do it in multiple messages), or  
+3. Paste the output of one of these commands:
 
 ```bash
-python - <<'PY'
-import os
-root="src"
-for dirpath, _, filenames in os.walk(root):
-    for fn in sorted(filenames):
-        if fn.endswith((".ts",".tsx")) and not fn.endswith(".d.ts"):
-            path=os.path.join(dirpath,fn)
-            print("\n" + "="*80)
-            print(path)
-            print("="*80)
-            with open(path,"r",encoding="utf-8") as f:
-                print(f.read())
-PY
+# Option A: print all TS files with headers
+find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print -exec sed -n '1,200p' {} \;
+
+# Option B: make a single text bundle
+find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print0 | xargs -0 cat > src-bundle.txt
 ```
 
-### A couple of quick preferences (tell me yes/no)
-1) Do you want the `.d.ts` to reflect only **public exports** (recommended), or **everything** in `src` (including internal/non-exported)?
-2) Should I include the runtime entrypoints (`index.ts`) exactly as exported, or also “flatten” and re-export nested modules for easier LLM scanning?
+If the package also has `index.ts`/barrel exports or `package.json` `exports` field, include those too so I mirror what’s actually public.
 
-Once you provide the `src` contents, I’ll reply with a single `.d.ts` file in one code block.
+### What I’ll produce
+A single `.d.ts` file that:
+
+- Represents the **public footprint** (exports) of the SDK
+- Flattens/re-exports types into one file where possible
+- Keeps **all doc comments 1:1** (no edits)
+- Uses `declare namespace` / `declare module` only if needed
+- Avoids implementation details; only types, interfaces, classes, functions, constants, enums, and exported members
+
+### One quick question (so I match your intent)
+Should the `.d.ts` reflect:
+- **Only what consumers can import** (recommended), or
+- **Everything in `src/` even if not exported**?
+
+Reply with the files (or zip) and your preference, and I’ll generate the single `.d.ts`.
