@@ -1,34 +1,26 @@
-I can do that, but I can’t access external URLs directly from here. If you paste the contents of that `src/` directory (or upload a zip / paste key files), I’ll generate a single consolidated `index.d.ts` that summarizes the full public API surface and preserves doc-comments **verbatim**.
+I can do that, but I can’t directly fetch URLs from uithub/GitHub from inside this chat. If you paste the repo contents (or upload a zip), I’ll generate a single consolidated `.d.ts` file with all exported types/classes/functions and I’ll preserve doc-comments **1:1**.
 
 ### What I need from you
 Pick one:
 
-1. **Upload** a zip of `src/`, or  
-2. Paste the files (you can do it in multiple messages), or  
-3. Paste the output of one of these commands:
+1. **Upload a zip** of `src/` (or the whole repo), or  
+2. **Paste the TypeScript files** from `src/` here (can be multiple messages), or  
+3. Run this locally and paste the output:
+   ```bash
+   # from the repo root
+   tar -czf src.tgz src
+   # upload src.tgz here
+   ```
 
-```bash
-# Option A: print all TS files with headers
-find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print -exec sed -n '1,200p' {} \;
+If you want the `.d.ts` to reflect the *published* surface (best for an LLM), also include `package.json` and `tsconfig.json` (or at least tell me the entrypoints/exports).
 
-# Option B: make a single text bundle
-find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print0 | xargs -0 cat > src-bundle.txt
-```
+### What I will produce
+- A **single** file, e.g. `parallel-sdk-api.d.ts`
+- Only the **public API footprint** (what a consumer can import/use)
+- **All doc comments copied 1:1** wherever they appear in source
+- `export` surface will be flattened/organized, but without changing comment text
 
-If the package also has `index.ts`/barrel exports or `package.json` `exports` field, include those too so I mirror what’s actually public.
+### Optional preference (tell me)
+- Should I mirror the package’s module structure (e.g. `export * from "./client"`), or output a single `declare module "parallel-sdk"` block with everything inside?
 
-### What I’ll produce
-A single `.d.ts` file that:
-
-- Represents the **public footprint** (exports) of the SDK
-- Flattens/re-exports types into one file where possible
-- Keeps **all doc comments 1:1** (no edits)
-- Uses `declare namespace` / `declare module` only if needed
-- Avoids implementation details; only types, interfaces, classes, functions, constants, enums, and exported members
-
-### One quick question (so I match your intent)
-Should the `.d.ts` reflect:
-- **Only what consumers can import** (recommended), or
-- **Everything in `src/` even if not exported**?
-
-Reply with the files (or zip) and your preference, and I’ll generate the single `.d.ts`.
+Once you provide `src/`, I’ll generate the consolidated `.d.ts`.

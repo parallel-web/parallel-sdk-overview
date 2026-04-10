@@ -1,29 +1,29 @@
-I can do this, but I can’t directly fetch that GitHub/uithub URL from here. If you paste (or upload) the contents of the package (the `src/parallel/` directory: all `.py` files), I’ll generate a single consolidated `parallel.pyi` that:
+I can do this, but I can’t access that URL directly from here. If you paste the source tree (or a zip) for `src/parallel/` (or at least all `.py` files in that directory), I’ll generate a single consolidated `parallel.pyi` that reflects the full public API surface and will copy docstrings/comments 1:1 where present.
 
-- exports the full public surface (modules/classes/functions/constants)
-- preserves signatures and types as best as possible
-- copies docstrings **1:1** where present (no edits)
-- includes re-exports from `__init__.py`
-- uses `typing`/`typing_extensions` as needed
+To make this easy, please provide one of the following:
 
-### What I need from you
-Either:
-1) Upload a zip of `src/parallel/`, or  
-2) Paste the contents of all files under `src/parallel/` (including `__init__.py`), or  
-3) If you can’t share everything, at minimum share:
-   - `src/parallel/__init__.py`
-   - all modules imported/re-exported by `__init__.py`
-   - anything under `src/parallel/types*`, `models*`, `client*`, etc.
+1) **Upload a zip** of `src/parallel/`  
+or  
+2) **Paste** the contents of all `.py` files under `src/parallel/` (including subpackages)  
+or  
+3) **Run a command locally** and paste the output:
 
-### Output format
-I’ll return a single file named something like:
+```bash
+python - <<'PY'
+import os, pathlib
+root = pathlib.Path("src/parallel")
+for p in sorted(root.rglob("*.py")):
+    print("\n# ===== FILE:", p.as_posix(), "=====")
+    print(p.read_text(encoding="utf-8"))
+PY
+```
 
-- `parallel.pyi` (flat, consolidated), or if you prefer:
-- `parallel/__init__.pyi` (package-style stub)
+Also tell me:
+- Should the stub reflect **only the public API** (recommended: exclude `_private` names), or **everything**?
+- What should the top-level module name be: `parallel.pyi` (recommended) or something else?
 
-Tell me which you want.
-
-### One quick question
-Do you want the stub to include **all internal modules** too, or only the **public API** (what’s reachable from `import parallel` / documented entrypoints)?
-
-Once you provide the code, I’ll produce the `.pyi` in one shot.
+Once I have the code, I’ll return a **single `.pyi`** file that:
+- includes all exported classes/functions/constants/types
+- preserves docstrings 1:1 (in triple-quoted strings) where available
+- includes `typing` imports and forward refs as needed
+- uses `@overload` for overloaded call patterns when detectable
