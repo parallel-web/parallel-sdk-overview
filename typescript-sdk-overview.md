@@ -1,28 +1,29 @@
-I can do this, but I can’t directly fetch that GitHub URL from here. If you paste (or upload) the contents of the `src/` folder (or a zip), I’ll generate a single consolidated `parallel-sdk.d.ts` that:
+I can, but I can’t access that GitHub URL from here to read the repository contents directly.
 
-- merges/re-exports everything into one file,
-- preserves the public API surface (“footprint”) across the whole SDK,
-- copies doc-comments **1:1** wherever they exist (no edits),
-- keeps type names/signatures intact, and
-- removes implementation while keeping type structure.
+If you paste the contents of `src/` (or upload a zip / the files), I’ll generate a single `index.d.ts` that summarizes the exported API surface and I’ll copy doc-comments **1:1** wherever they exist.
 
 ### What I need from you
-Choose one:
+One of these options:
 
-1) **Upload a zip** of the repository (or at least `src/`) here, or  
-2) Paste the files (even large is fine), or  
-3) If you can run a command locally, send me the generated listing:
+1. **Upload files**: upload the `src/` folder (or the whole repo) here.
+2. **Paste**: paste the contents of all `.ts` files under `src/` (including `index.ts`, `client.ts`, etc.).
+3. **Command output**: run this locally and paste the output:
+   ```bash
+   git clone https://github.com/parallel-web/parallel-sdk-typescript.git
+   cd parallel-sdk-typescript
+   find src -type f -name "*.ts" -print -exec sed -n '1,2000p' {} \;
+   ```
+   (If any files are longer than 2000 lines, we can adjust.)
 
-```bash
-# from repo root
-find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print
-```
+### What I’ll produce
+- A **single** `.d.ts` file (e.g., `parallel-sdk.d.ts`) containing:
+  - All exported types/interfaces/classes/functions
+  - All namespaces/modules if used
+  - Re-exports flattened where practical
+  - **Doc comments copied verbatim (1:1)** from the source (JSDoc blocks)
+- No implementation—types only—so an LLM can “see” the full footprint.
 
-and then either paste the file contents or upload them.
-
-### If you prefer to generate it locally (fastest)
-If you can run Node locally, I can also give you a script that:
-- uses the TypeScript compiler API to emit a single `.d.ts`,
-- then post-processes to inline re-exports and keep JSDoc intact.
-
-Tell me which route you want (upload vs. paste vs. local script), and I’ll produce the single `.d.ts` file.
+Send the files (or paste them) and tell me if you want the output to assume:
+- `moduleResolution: bundler` vs `node`
+- ESM-only vs dual (`export =` / `default`)  
+If you’re not sure, I’ll infer it from `package.json`/`tsconfig.json` once you provide them.
