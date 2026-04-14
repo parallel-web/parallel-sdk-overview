@@ -1,29 +1,50 @@
-I can, but I can’t access that GitHub URL from here to read the repository contents directly.
+I can, but I can’t access that GitHub URL from here directly. If you paste the contents of the `src/` files (or upload a zip / tarball, or paste the repository tree + file contents), I’ll generate a single consolidated `index.d.ts` that captures the full public API surface and will copy doc-comments 1:1.
 
-If you paste the contents of `src/` (or upload a zip / the files), I’ll generate a single `index.d.ts` that summarizes the exported API surface and I’ll copy doc-comments **1:1** wherever they exist.
+To make this easy, here are two quick ways you can provide the source:
 
-### What I need from you
-One of these options:
+## Option A: Paste files (recommended)
+1. Paste the `src/` directory tree.
+2. Paste each file’s content (you can do it in multiple messages).
 
-1. **Upload files**: upload the `src/` folder (or the whole repo) here.
-2. **Paste**: paste the contents of all `.ts` files under `src/` (including `index.ts`, `client.ts`, etc.).
-3. **Command output**: run this locally and paste the output:
-   ```bash
-   git clone https://github.com/parallel-web/parallel-sdk-typescript.git
-   cd parallel-sdk-typescript
-   find src -type f -name "*.ts" -print -exec sed -n '1,2000p' {} \;
-   ```
-   (If any files are longer than 2000 lines, we can adjust.)
+## Option B: Upload an archive
+Upload a `.zip` of the `src/` folder here.
 
-### What I’ll produce
-- A **single** `.d.ts` file (e.g., `parallel-sdk.d.ts`) containing:
-  - All exported types/interfaces/classes/functions
-  - All namespaces/modules if used
-  - Re-exports flattened where practical
-  - **Doc comments copied verbatim (1:1)** from the source (JSDoc blocks)
-- No implementation—types only—so an LLM can “see” the full footprint.
+## Option C: Command output (if you can run locally)
+Run these and paste the outputs:
 
-Send the files (or paste them) and tell me if you want the output to assume:
-- `moduleResolution: bundler` vs `node`
-- ESM-only vs dual (`export =` / `default`)  
-If you’re not sure, I’ll infer it from `package.json`/`tsconfig.json` once you provide them.
+```bash
+# 1) Tree
+python - <<'PY'
+import os
+for root, dirs, files in os.walk("src"):
+    for f in sorted(files):
+        if f.endswith((".ts", ".tsx")):
+            print(os.path.join(root, f))
+PY
+
+# 2) Concatenate all src TS files with clear separators
+python - <<'PY'
+import os
+for root, dirs, files in os.walk("src"):
+    for f in sorted(files):
+        if f.endswith((".ts", ".tsx")):
+            path = os.path.join(root, f)
+            print("\n" + "/"*80)
+            print("// FILE:", path)
+            print("/"*80 + "\n")
+            with open(path, "r", encoding="utf-8") as fh:
+                print(fh.read())
+PY
+```
+
+---
+
+### What I will produce
+A single `.d.ts` file that:
+- Exposes the same public exports as the package (barrel exports included).
+- Preserves *all* doc-comments exactly (copied verbatim).
+- Flattens internal module structure into one file where possible (or uses `declare module` blocks only if necessary).
+- Includes type aliases, interfaces, classes, enums, function signatures, namespaces, and re-exported types.
+- Avoids implementation details (no function bodies), suitable for an LLM to “see” the API.
+
+If you tell me which entrypoint is authoritative (e.g. `src/index.ts`), I’ll mirror that export surface precisely.

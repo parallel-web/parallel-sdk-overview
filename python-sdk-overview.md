@@ -1,43 +1,38 @@
-I can, but I can’t directly access that URL from here. If you paste the package source (or upload a zip / the `src/parallel` directory contents), I’ll generate a single consolidated `parallel.pyi` that mirrors the full public API and copies docstrings 1:1.
+I can, but I can’t access that URL directly from here. If you paste the contents of the package (or upload a zip / the `src/parallel` directory), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API surface and copies docstrings/comments 1:1.
 
-In the meantime, here are two ways to get this done quickly:
+### What I need from you
+Pick one option:
 
-## Option A (recommended): Paste the code here
-Run this locally and paste the output:
+1) **Upload files**: upload the repository folder (or just `src/parallel/**`), or a zip.
 
+2) **Paste tree + files**: paste:
+- `src/parallel/__init__.py`
+- every module under `src/parallel/` (all `.py` files)
+- any `py.typed` or `__all__` exports if present
+
+3) **Run a script and paste output** (fastest if you can run Python locally):
 ```bash
 python - <<'PY'
 import os, pathlib
 root = pathlib.Path("src/parallel")
 for p in sorted(root.rglob("*.py")):
     print("\n" + "="*80)
-    print(p)
+    print(p.as_posix())
     print("="*80)
-    print(p.read_text(encoding="utf-8", errors="replace"))
+    print(p.read_text(encoding="utf-8"))
 PY
 ```
 
-## Option B: Let me generate it from your machine automatically
-If you can run a script locally, this will:
-1) import/parse the package,
-2) collect signatures/docstrings,
-3) write a single `parallel.pyi`.
+### What I will produce
+A **single file** (e.g. `parallel.pyi`) that:
+- Aggregates the **public footprint** of `parallel` (classes, functions, constants, typed dicts, protocols, etc.)
+- Preserves **doc-comments/docstrings exactly** as present (copied 1:1, no edits)
+- Resolves re-exports from `__init__.py` so an LLM can see “what you import”
+- Adds imports and forward references so the stub is valid for type checkers
 
-Tell me your Python version and whether `parallel` can be imported in that environment (installed editable is fine). I’ll tailor the script accordingly.
+### One clarification
+Do you want:
+- **Only the public API** (recommended): everything exported via `__all__`, and/or imported into package `__init__.py`, plus public names (not starting with `_`)?
+- Or **everything including internal modules**?
 
----
-
-## What I need from you
-Please provide **one** of:
-- the contents of `src/parallel/**.py` (pasted), or
-- a zip/tar of the repository or `src/parallel`, or
-- confirmation you can run a local generator script (and share the output files).
-
-Once you provide the sources, I will return a **single** `.pyi` file that:
-- includes all public modules/classes/functions/TypedDicts/enums,
-- preserves docstrings **verbatim** (copied 1:1),
-- includes imports/exports so the “footprint” is visible to an LLM in one file.
-
-If you paste the code, also tell me whether you want to include:
-- only the **public** API (`__all__` / non-underscore symbols), or
-- **everything** in the package (including internal helpers).
+Reply with the files (or a zip) and your preference, and I’ll generate the unified `.pyi`.
