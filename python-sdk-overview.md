@@ -1,38 +1,27 @@
-I can, but I can’t access that URL directly from here. If you paste the contents of the package (or upload a zip / the `src/parallel` directory), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API surface and copies docstrings/comments 1:1.
+I can do this, but I can’t access external URLs from here (including uithub.com) to read the repository contents directly. If you paste the source tree (or upload a zip / paste the files under `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API footprint and copies docstrings 1:1.
 
-### What I need from you
-Pick one option:
+To make this easy, please provide one of the following:
 
-1) **Upload files**: upload the repository folder (or just `src/parallel/**`), or a zip.
-
-2) **Paste tree + files**: paste:
-- `src/parallel/__init__.py`
-- every module under `src/parallel/` (all `.py` files)
-- any `py.typed` or `__all__` exports if present
-
-3) **Run a script and paste output** (fastest if you can run Python locally):
+1) **Upload a zip** of `src/parallel/` (best), or  
+2) Paste the output of:
 ```bash
 python - <<'PY'
-import os, pathlib
-root = pathlib.Path("src/parallel")
-for p in sorted(root.rglob("*.py")):
-    print("\n" + "="*80)
-    print(p.as_posix())
-    print("="*80)
-    print(p.read_text(encoding="utf-8"))
+import os
+root="src/parallel"
+for dirpath,_,filenames in os.walk(root):
+    for f in sorted(filenames):
+        if f.endswith(".py"):
+            p=os.path.join(dirpath,f)
+            print("\n# ===",p,"===\n")
+            print(open(p,"r",encoding="utf-8").read())
 PY
 ```
 
-### What I will produce
-A **single file** (e.g. `parallel.pyi`) that:
-- Aggregates the **public footprint** of `parallel` (classes, functions, constants, typed dicts, protocols, etc.)
-- Preserves **doc-comments/docstrings exactly** as present (copied 1:1, no edits)
-- Resolves re-exports from `__init__.py` so an LLM can see “what you import”
-- Adds imports and forward references so the stub is valid for type checkers
+Once I have the code, I will:
+- Produce **one** `.pyi` file (single module stub) that includes the full public surface area (classes, functions, constants, type aliases).
+- Preserve **all docstrings exactly** where present (triple-quoted strings copied 1:1 into the stub).
+- Add `typing`/`typing_extensions` imports as needed.
+- Keep signatures faithful (including default values where statically determinable).
+- Represent re-exports (`__init__.py`) so an LLM “sees” the same entrypoints users import.
 
-### One clarification
-Do you want:
-- **Only the public API** (recommended): everything exported via `__all__`, and/or imported into package `__init__.py`, plus public names (not starting with `_`)?
-- Or **everything including internal modules**?
-
-Reply with the files (or a zip) and your preference, and I’ll generate the unified `.pyi`.
+If you want, tell me the intended top-level name (e.g., `parallel.pyi` or `parallel/__init__.pyi`-style flattened), but otherwise I’ll output a single `parallel_sdk.pyi` (or `parallel.pyi`) that aggregates everything.
