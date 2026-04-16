@@ -1,27 +1,33 @@
-I can do this, but I can’t access external URLs from here (including uithub.com) to read the repository contents directly. If you paste the source tree (or upload a zip / paste the files under `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API footprint and copies docstrings 1:1.
+I can do this, but I can’t directly fetch or browse that URL from here. If you paste the source tree contents (or upload a zip / paste the files), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API footprint and copies docstrings/comments 1:1.
 
-To make this easy, please provide one of the following:
+To make this easy, please provide **one** of the following:
 
-1) **Upload a zip** of `src/parallel/` (best), or  
+1) **Upload** the repository zip (or just `src/parallel/`), or  
 2) Paste the output of:
 ```bash
-python - <<'PY'
-import os
-root="src/parallel"
-for dirpath,_,filenames in os.walk(root):
-    for f in sorted(filenames):
-        if f.endswith(".py"):
-            p=os.path.join(dirpath,f)
-            print("\n# ===",p,"===\n")
-            print(open(p,"r",encoding="utf-8").read())
-PY
+python -c "import os; import pathlib; p=pathlib.Path('src/parallel'); 
+print('\n'.join(str(x) for x in p.rglob('*.py')))"
 ```
+and then paste the contents of those `.py` files, or  
+3) If you have `git` locally, paste:
+```bash
+git clone https://github.com/parallel-web/parallel-sdk-python.git
+cd parallel-sdk-python
+tar -czf parallel_src.tgz src/parallel
+```
+and upload `parallel_src.tgz`.
 
-Once I have the code, I will:
-- Produce **one** `.pyi` file (single module stub) that includes the full public surface area (classes, functions, constants, type aliases).
-- Preserve **all docstrings exactly** where present (triple-quoted strings copied 1:1 into the stub).
-- Add `typing`/`typing_extensions` imports as needed.
-- Keep signatures faithful (including default values where statically determinable).
-- Represent re-exports (`__init__.py`) so an LLM “sees” the same entrypoints users import.
+### What I will produce
+- A **single** `.pyi` file (e.g., `parallel.pyi`) that includes:
+  - all public modules/classes/functions/constants/types that are part of the package surface
+  - accurate signatures (including defaults, `*`, `**`, overloads when present)
+  - imports/exports (`__all__`, re-exports) reflected so an LLM sees the real shape
+  - doc-comments/docstrings copied **verbatim** (1:1) wherever available
+- I’ll avoid implementation bodies (stub-only), but preserve type aliases, Protocols, TypedDicts, Enums, dataclasses structure, etc.
 
-If you want, tell me the intended top-level name (e.g., `parallel.pyi` or `parallel/__init__.pyi`-style flattened), but otherwise I’ll output a single `parallel_sdk.pyi` (or `parallel.pyi`) that aggregates everything.
+### One clarification (optional)
+Do you want the stub to reflect:
+- **Only public API** (what a user can import from `parallel`), or
+- **Everything under `src/parallel/**`**, including internal/private modules?
+
+If you upload/paste the code, I’ll generate the `.pyi` in the next message.
