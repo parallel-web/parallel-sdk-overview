@@ -1,29 +1,42 @@
-I can, but I can’t directly fetch that GitHub URL from here. If you paste the contents of the `src/` folder (or upload a zip / paste file-by-file), I’ll generate a single consolidated `index.d.ts` that reflects the full public API surface and I’ll copy doc-comments over **1:1**.
+I can do this, but I can’t access that URL from here to read the repository contents directly.
 
-To make this efficient, please provide one of these:
+If you paste the contents of the `src/` folder (or upload a zip), I’ll generate a **single consolidated `index.d.ts`** that summarizes the public API surface, and I’ll **copy doc-comments 1:1** exactly as they appear.
 
-1) **Zip upload** of the repository (or just `src/`), or  
-2) Paste the output of:
+### What I need from you
+Pick one:
+
+1. **Upload a zip** of `src/` (best), or  
+2. Paste:
+   - the output of `tree -a src`
+   - and the contents of each `.ts` file under `src/` (or at least all exported/public ones)
+
+### If you want to generate the files locally (easy)
+Run these and paste the outputs:
+
 ```bash
-git clone https://github.com/parallel-web/parallel-sdk-typescript.git
-cd parallel-sdk-typescript
-tar -czf src.tgz src
+# 1) list the structure
+tree -a src
+
+# 2) dump all TS sources into one paste (keeps filenames)
+for f in $(find src -type f -name "*.ts"); do
+  echo "//// FILE: $f"
+  echo
+  cat "$f"
+  echo
+  echo
+done
 ```
-and upload `src.tgz`, or  
-3) Paste all `.ts` files under `src/` (including `index.ts`, `client.ts`, etc.).
 
 ### What I will produce
-- A **single** `.d.ts` file (e.g. `parallel-sdk.d.ts`) that:
-  - Exports the same public types/classes/functions as the package.
-  - Preserves **all JSDoc/doc-comments verbatim** (copied 1:1).
-  - Inlines/re-exports types so an LLM can understand the “footprint” without traversing files.
-  - Avoids implementation details; only declarations.
+- A single `parallel-sdk.d.ts` (or whatever name you want)
+- Re-exports resolved into one file where possible
+- Types/interfaces/classes/functions as declared by the SDK
+- **All doc comments copied verbatim (1:1)**
+- Only the “public footprint” (things that are exported), unless you ask for internal types too
 
-### One clarification (so the result matches your intent)
-Do you want the `.d.ts` to represent:
-- **Only the public entrypoints** (what consumers can import from the package), or
-- **Everything in `src/`**, even internal modules?
+### One question
+Do you want the `.d.ts` to reflect:
+- **Only what’s exported from the package entrypoint** (e.g., `src/index.ts`), or
+- **Everything exported anywhere in `src/`**?
 
-If you answer “public entrypoints,” include `package.json` + the entry file(s) (`src/index.ts` etc.) so I can mirror the real exported surface exactly.
-
-Send the files and I’ll return the single consolidated `.d.ts`.
+Send the `src/` content and your preference, and I’ll generate the single consolidated `.d.ts`.
