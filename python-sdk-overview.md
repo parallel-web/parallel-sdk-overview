@@ -1,39 +1,36 @@
-I can do this, but I can’t access that URL directly from here. If you paste (or upload) the contents of the package (the files under `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that captures the public API surface and will copy docstrings 1:1 where present.
+I can do this, but I can’t directly fetch that GitHub/uithub URL from here.
 
-### What I need from you
-Pick one of these:
+If you paste either:
 
-1) **Upload a zip** of `src/parallel/` (best), or  
-2) **Paste the full text** of each `.py` file under `src/parallel/` (including `__init__.py`), or  
-3) Tell me the exact commit hash + paste file listing and contents.
+1) the contents of `src/parallel/` (all `.py` files), or  
+2) a zip/tar of the repo (or just that folder), or  
+3) the raw text of each file in that package,
+
+…I’ll generate a single consolidated `parallel.pyi` that covers the public API surface area, and I’ll copy docstrings/comments over 1:1 where present.
 
 ### What I will produce
-- A **single** `.pyi` file (e.g., `parallel.pyi`) that:
-  - includes all public classes/functions/constants/types
-  - includes signatures (including overloads where appropriate)
-  - preserves **docstrings verbatim (1:1)** wherever they exist
-  - includes imports/exports to match how users import from `parallel`
-  - uses `typing`, `typing_extensions`, `dataclasses` stubs as needed
-  - marks private/internal members as omitted unless they are part of the public surface
+- One file: `parallel.pyi`
+- Includes:
+  - all exported classes/functions/constants/types across the package
+  - `__init__.py` re-exports (so the “main” API matches what users import)
+  - `TypedDict`/`Protocol`/`Enum`/dataclasses signatures where applicable
+  - overloads and generics if present
+  - docstrings copied verbatim (no edits)
 
-### Quick repo-side way to provide the content
-If you can run commands locally, you can paste the output of:
+### What I need from you
+Please provide one of the following:
 
+**Option A (best):** paste the output of:
 ```bash
-python - <<'PY'
-import pathlib
-root = pathlib.Path("src/parallel")
-for p in sorted(root.rglob("*.py")):
-    print("\n" + "="*80)
-    print(str(p))
-    print("="*80)
-    print(p.read_text(encoding="utf-8"))
-PY
+python -c "import os,glob; 
+p='src/parallel'; 
+files=sorted(glob.glob(p+'/**/*.py', recursive=True)); 
+print('\n'.join(files))"
 ```
+…and then paste each file’s content (or upload them).
 
-### One clarification (so the stub matches your intent)
-Do you want the stub to cover:
-- **Only the public API** (things imported/usable by end users), or
-- **Everything** in `src/parallel/` including “internal” modules?
+**Option B:** upload a zip of `src/parallel/`.
 
-Reply with the files (or a zip) and your preference, and I’ll generate the single `.pyi` in one go.
+**Option C:** paste the repo’s `src/parallel/__init__.py` plus any other modules it imports/re-exports (and we iterate).
+
+Once you provide the code, I’ll respond with the complete `.pyi` in one block.
