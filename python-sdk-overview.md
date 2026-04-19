@@ -1,36 +1,24 @@
-I can do this, but I can’t directly fetch that GitHub/uithub URL from here.
-
-If you paste either:
-
-1) the contents of `src/parallel/` (all `.py` files), or  
-2) a zip/tar of the repo (or just that folder), or  
-3) the raw text of each file in that package,
-
-…I’ll generate a single consolidated `parallel.pyi` that covers the public API surface area, and I’ll copy docstrings/comments over 1:1 where present.
-
-### What I will produce
-- One file: `parallel.pyi`
-- Includes:
-  - all exported classes/functions/constants/types across the package
-  - `__init__.py` re-exports (so the “main” API matches what users import)
-  - `TypedDict`/`Protocol`/`Enum`/dataclasses signatures where applicable
-  - overloads and generics if present
-  - docstrings copied verbatim (no edits)
+I can do this, but I can’t directly access that URL from within this chat session. If you paste the repository contents (or upload a zip / the `src/parallel` directory), I’ll generate a single consolidated `.pyi` that mirrors the public API and copies docstrings 1:1.
 
 ### What I need from you
-Please provide one of the following:
+Pick one:
 
-**Option A (best):** paste the output of:
-```bash
-python -c "import os,glob; 
-p='src/parallel'; 
-files=sorted(glob.glob(p+'/**/*.py', recursive=True)); 
-print('\n'.join(files))"
-```
-…and then paste each file’s content (or upload them).
+1. **Upload** the `src/parallel` folder (or the whole repo) here, or  
+2. **Paste** the contents of all `.py` files under `src/parallel` (including `__init__.py`), or  
+3. Tell me you can run a command and paste the output:
+   - `python -c "import pathlib; p=pathlib.Path('src/parallel'); print('\n'.join(str(x) for x in p.rglob('*.py')))"`  
+   Then paste each file’s content (or I can give you a small script to dump them all into one paste).
 
-**Option B:** upload a zip of `src/parallel/`.
+### What I will produce
+- A **single** `parallel.pyi` (or `parallel_sdk.pyi`, your choice) that:
+  - Includes all modules’ exported classes/functions/types consolidated into one stub file
+  - Preserves **docstrings exactly 1:1** where present (I’ll place them in the stub right under the corresponding definition)
+  - Includes imports/typing needed for the signatures
+  - Represents overloads, TypedDicts, Enums, Protocols, dataclasses, etc., when present
+  - Avoids implementation bodies (as `.pyi` should)
 
-**Option C:** paste the repo’s `src/parallel/__init__.py` plus any other modules it imports/re-exports (and we iterate).
+### Two quick clarifying questions (optional)
+1. Do you want the stub to reflect only the **public** API (things exported via `parallel/__init__.py`), or **everything** under `src/parallel`?
+2. What Python version target? (Default: 3.10+)
 
-Once you provide the code, I’ll respond with the complete `.pyi` in one block.
+Once you provide the source files, I’ll return the complete consolidated `.pyi` in one code block.
