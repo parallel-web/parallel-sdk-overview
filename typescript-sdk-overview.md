@@ -1,27 +1,33 @@
-I can, but I can’t access that URL directly from here. If you paste the TypeScript source (or upload a zip / the `src/` folder contents), I’ll generate a single consolidated `index.d.ts` that summarizes the public API footprint, and I’ll copy doc-comments over **verbatim** (1:1) wherever they exist.
+I can do this, but I can’t fetch or browse that GitHub URL from here. If you paste the contents of `src/` (or upload a zip / the key `.ts` files), I’ll generate a single consolidated `index.d.ts` that summarizes the public API footprint and **copy doc-comments 1:1**.
 
-To make this easy, please provide one of these:
+To make this fast and correct, please do one of the following:
 
-1) **Upload** the repository zip, or  
-2) Paste the contents of:
-- `src/index.ts` (or package entrypoint in `package.json`)
-- all files under `src/` (you can paste in multiple messages), or  
-3) Run this locally and paste the output:
+## Option A (best): paste a file tree + file contents
+1. Paste the output of:
+   ```bash
+   ls -R src
+   ```
+2. Then paste the contents of all `.ts` files under `src/` (or at least anything exported).
 
+## Option B: upload an archive
+Upload a `.zip` of the repo (or just `src/`).
+
+## Option C: run a command and paste output
+If you can run TypeScript locally, you can also paste emitted declarations and I’ll condense them:
 ```bash
-# from repo root
-find src -type f \( -name "*.ts" -o -name "*.tsx" \) -maxdepth 99 -print
+pnpm i
+pnpm -s tsc --declaration --emitDeclarationOnly --outDir /tmp/decls
 ```
+Then paste `/tmp/decls/**/*.d.ts`.
 
-and then either:
-- paste those files, or
-- tar them and upload.
+---
 
-Once I have the code, I will produce a single `.d.ts` file that:
-- Exposes the same exported surface as the package entrypoint(s)
-- Flattens/re-exports as needed into one file
-- Preserves JSDoc comments **exactly** as in source (no edits)
-- Includes all public types/interfaces/classes/functions/constants/enums
-- Avoids implementation details (no bodies), but keeps overloads and generics
+### A couple quick questions (so the .d.ts matches your intent)
+1. Should the single `.d.ts` represent only **public exports** (what consumers import), or **everything** in `src/` including internal types?
+2. What module name should it declare (e.g. `declare module "parallel-sdk"`), or should it just be a bare file with `export ...`?
 
-If you tell me the intended entrypoint (e.g. `src/index.ts`) and the package name (e.g. `"parallel-sdk"`), I’ll align the `declare module "..."` wrapper accordingly.
+Once I have the source (or emitted decls), I’ll return a single `.d.ts` that:
+- flattens re-exports into one file,
+- preserves JSDoc comments **verbatim** (1:1),
+- keeps namespaces/modules consistent with your package entrypoints,
+- includes interfaces/types/classes/functions/enums and key generics so an LLM can “see” the API surface.
