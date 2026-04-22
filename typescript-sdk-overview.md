@@ -1,33 +1,61 @@
-I can do that, but I can’t access external URLs from here. If you paste the contents of the `src/` directory (or upload a zip / paste key files), I’ll generate a single consolidated `parallel-sdk.d.ts` that mirrors the public API surface and preserves doc-comments **1:1**.
+I can do this, but I can’t directly fetch that GitHub URL from here. If you paste (or upload) the TypeScript source from `src/` (or a zip of the repo), I’ll generate a single consolidated `index.d.ts` that reflects the public API footprint and will copy doc-comments over verbatim.
 
-In the meantime, here’s exactly what I need and what I will output.
+To make this easy, here are two options:
 
-## What to provide
-Either:
+## Option A (fastest): upload a zip
+1. Download the repo as a zip (or `git clone` and zip it).
+2. Upload the zip here.
+3. Tell me whether you want:
+   - **Only the public API** (exports from the package entry), or
+   - **Everything in src** (even internal modules).
 
-1. **Zip** of the repo or the `src/` folder, or  
-2. Paste:
-   - `src/index.ts` (or whatever the entrypoint is)
-   - any exported modules/classes/types under `src/`
-   - `package.json` (helps identify entrypoint + export map)
-   - `tsconfig.json` (optional but helpful)
+## Option B: paste file contents
+Paste:
+- `src/**` files, and also
+- `package.json` and any `src/index.ts` (or whatever the entry file is).
 
-If there are many files, you can paste a file tree plus the contents of all `export`-reachable files.
+---
 
-## What I will generate
-A single file, e.g. `parallel-sdk.d.ts`, that:
+## If you want to generate it locally (I can still refine it)
+If you *can* run commands locally, you can generate a single `.d.ts` bundle and paste it back for me to clean up / ensure it preserves comments:
 
-- contains only the **publicly exported** API footprint (what consumers can import)
-- includes **all JSDoc/doc-comments copied verbatim 1:1**
-- flattens re-exports into one place (while keeping namespaces/modules consistent)
-- preserves `export type`, `export interface`, `export class`, `export enum`, overloads, generics, etc.
-- includes `declare module "parallel-sdk"` (or correct package name) wrapper if you want
+### 1) Create a temporary `tsconfig.build.json`
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "stripInternal": false,
+    "removeComments": false,
+    "outDir": "dist-types"
+  },
+  "include": ["src/**/*"]
+}
+```
 
-## Quick question (so I format it correctly)
-What module name should the declaration target?
+### 2) Build declarations
+```bash
+npx tsc -p tsconfig.build.json
+```
 
-- Option A: `declare module "parallel-sdk"`  
-- Option B: `declare module "@parallel/sdk"` (or whatever the real package name is)  
-- Option C: no module wrapper; just top-level `export ...`
+### 3) Bundle into one .d.ts
+Use `dts-bundle-generator`:
+```bash
+npx dts-bundle-generator -o parallel-sdk.d.ts src/index.ts
+```
 
-Tell me which option, and paste/upload the code, and I’ll return the single `.d.ts` file.
+Then paste `parallel-sdk.d.ts` here and I’ll:
+- ensure it’s a clean “API footprint” (minimal but complete),
+- preserve doc-comments 1:1 where present,
+- remove implementation-only artifacts, and
+- optionally add a top-level `declare module "parallel-sdk"` wrapper if you want it.
+
+---
+
+### Quick clarification (so I produce the right thing)
+1) What’s the package name you want in `declare module "…"` (from `package.json`)?  
+2) Do you want **only what’s exported** from the entrypoint, or **every type/class in src**?
+
+Send the code/zip and your preference, and I’ll return the single consolidated `.d.ts`.
