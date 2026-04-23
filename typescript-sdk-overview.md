@@ -1,61 +1,123 @@
-I can do this, but I can’t directly fetch that GitHub URL from here. If you paste (or upload) the TypeScript source from `src/` (or a zip of the repo), I’ll generate a single consolidated `index.d.ts` that reflects the public API footprint and will copy doc-comments over verbatim.
+I can, but I can’t directly fetch or crawl that URL from here. If you paste the contents of the `src/` files (or upload a zip / give me the repo files in chat), I’ll produce a single consolidated `index.d.ts` that reflects the exported public API surface and **copies doc-comments 1:1**.
 
-To make this easy, here are two options:
-
-## Option A (fastest): upload a zip
-1. Download the repo as a zip (or `git clone` and zip it).
-2. Upload the zip here.
-3. Tell me whether you want:
-   - **Only the public API** (exports from the package entry), or
-   - **Everything in src** (even internal modules).
-
-## Option B: paste file contents
-Paste:
-- `src/**` files, and also
-- `package.json` and any `src/index.ts` (or whatever the entry file is).
+In the meantime, here’s exactly what I will generate (and the constraints I’ll follow), plus a ready-to-run script you can use locally to produce a first-pass single-file `.d.ts` that you can then paste back here for me to refine.
 
 ---
 
-## If you want to generate it locally (I can still refine it)
-If you *can* run commands locally, you can generate a single `.d.ts` bundle and paste it back for me to clean up / ensure it preserves comments:
+## What I will produce
 
-### 1) Create a temporary `tsconfig.build.json`
-```json
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "declarationMap": false,
-    "stripInternal": false,
-    "removeComments": false,
-    "outDir": "dist-types"
-  },
-  "include": ["src/**/*"]
+A single file (e.g. `parallel-sdk.d.ts`) that:
+
+- Represents the **public footprint** of the SDK (what a consumer can import).
+- Preserves **JSDoc/doc-comments verbatim (1:1)** wherever they exist in the source.
+- Flattens/re-exports types so an LLM can read one file and understand the API.
+- Avoids implementation details (only declarations, not bodies).
+- Includes all exported:
+  - classes, functions, constants
+  - interfaces, types, enums
+  - namespaces (if used)
+  - module augmentations (if any)
+
+---
+
+## What I need from you
+
+Choose one option:
+
+### Option A (best): Paste the source files
+Paste the full contents of all `src/**/*.ts` files (or at least the barrel exports and all public modules). I’ll return the final `.d.ts`.
+
+### Option B: Run a local script to extract a single `.d.ts`
+Run the script below in the repo and paste the generated `parallel-sdk.d.ts` here. I’ll then ensure it matches the real public API and **re-insert any missing doc-comments 1:1** from source.
+
+---
+
+## Local generator script (first-pass single-file .d.ts)
+
+This uses TypeScript’s compiler to emit declarations, then rolls them up. It won’t always preserve every comment perfectly across rollup tools, but it’s a good baseline.
+
+1) Ensure dependencies:
+
+```bash
+npm i
+npm i -D typescript dts-bundle-generator
+```
+
+2) Create `tools/build-dts.mjs`:
+
+```js
+import { generateDtsBundle } from "dts-bundle-generator";
+import fs from "node:fs";
+import path from "node:path";
+
+const repoRoot = process.cwd();
+
+// Try common entrypoints; adjust if your package exports a different module.
+const candidates = [
+  "src/index.ts",
+  "src/main.ts",
+  "src/client.ts",
+];
+
+const entry = candidates
+  .map(p => path.join(repoRoot, p))
+  .find(p => fs.existsSync(p));
+
+if (!entry) {
+  console.error("Could not find an entry file. Please set entry manually in tools/build-dts.mjs");
+  process.exit(1);
 }
+
+const outFile = path.join(repoRoot, "parallel-sdk.d.ts");
+
+const [dts] = generateDtsBundle(
+  [{ filePath: entry }],
+  {
+    preferredConfigPath: path.join(repoRoot, "tsconfig.json"),
+    // Keep declarations fairly readable for LLMs:
+    exportReferencedTypes: true,
+    // Try to keep docs when possible:
+    // (Note: exact preservation depends on source + toolchain.)
+  }
+);
+
+fs.writeFileSync(outFile, dts, "utf8");
+console.log("Wrote", outFile);
 ```
 
-### 2) Build declarations
+3) Run:
+
 ```bash
-npx tsc -p tsconfig.build.json
+node tools/build-dts.mjs
 ```
 
-### 3) Bundle into one .d.ts
-Use `dts-bundle-generator`:
-```bash
-npx dts-bundle-generator -o parallel-sdk.d.ts src/index.ts
-```
-
-Then paste `parallel-sdk.d.ts` here and I’ll:
-- ensure it’s a clean “API footprint” (minimal but complete),
-- preserve doc-comments 1:1 where present,
-- remove implementation-only artifacts, and
-- optionally add a top-level `declare module "parallel-sdk"` wrapper if you want it.
+4) Paste `parallel-sdk.d.ts` back here, and I’ll:
+- verify it matches exports
+- correct any missing/incorrect shapes
+- **copy doc-comments 1:1** from the TS sources into the right declarations
+- ensure it’s a single coherent module surface (no broken `import()` types, etc.)
 
 ---
 
-### Quick clarification (so I produce the right thing)
-1) What’s the package name you want in `declare module "…"` (from `package.json`)?  
-2) Do you want **only what’s exported** from the entrypoint, or **every type/class in src**?
+## One key question (so I generate the right module shape)
 
-Send the code/zip and your preference, and I’ll return the single consolidated `.d.ts`.
+How do you want consumers to import it?
+
+1. `import { Parallel } from "parallel-sdk";` style (named exports), or  
+2. `import Parallel from "parallel-sdk";` style (default export), or  
+3. Both.
+
+If you’re not sure, paste `package.json` (especially `exports`, `main`, `types`) and the `src/index.ts` (or equivalent entry).
+
+---
+
+## Send me this and I’ll return the final single `.d.ts`
+
+Minimum set to paste:
+
+- `src/index.ts` (or whatever entry file is exported)
+- any files it re-exports publicly
+- `package.json`
+- `tsconfig.json` (optional but helpful)
+
+Once I have that, I’ll generate the single `.d.ts` in one response.
