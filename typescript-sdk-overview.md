@@ -1,123 +1,161 @@
-I can, but I can’t directly fetch or crawl that URL from here. If you paste the contents of the `src/` files (or upload a zip / give me the repo files in chat), I’ll produce a single consolidated `index.d.ts` that reflects the exported public API surface and **copies doc-comments 1:1**.
+I can do this, but I can’t directly fetch that GitHub URL from here. If you paste (or upload) the contents of `src/` (or a zip), I’ll generate a single consolidated `parallel-sdk.d.ts` with **all exported types**, and I’ll **copy doc-comments 1:1**.
 
-In the meantime, here’s exactly what I will generate (and the constraints I’ll follow), plus a ready-to-run script you can use locally to produce a first-pass single-file `.d.ts` that you can then paste back here for me to refine.
-
----
-
-## What I will produce
-
-A single file (e.g. `parallel-sdk.d.ts`) that:
-
-- Represents the **public footprint** of the SDK (what a consumer can import).
-- Preserves **JSDoc/doc-comments verbatim (1:1)** wherever they exist in the source.
-- Flattens/re-exports types so an LLM can read one file and understand the API.
-- Avoids implementation details (only declarations, not bodies).
-- Includes all exported:
-  - classes, functions, constants
-  - interfaces, types, enums
-  - namespaces (if used)
-  - module augmentations (if any)
+In the meantime, here’s exactly what I’ll produce and how; plus a ready-to-run script you can use locally to generate the single `.d.ts` and then share it back here for polishing.
 
 ---
 
-## What I need from you
+## What I need from you (pick one)
 
-Choose one option:
-
-### Option A (best): Paste the source files
-Paste the full contents of all `src/**/*.ts` files (or at least the barrel exports and all public modules). I’ll return the final `.d.ts`.
-
-### Option B: Run a local script to extract a single `.d.ts`
-Run the script below in the repo and paste the generated `parallel-sdk.d.ts` here. I’ll then ensure it matches the real public API and **re-insert any missing doc-comments 1:1** from source.
+1. **Upload a zip** of `src/` (best), or  
+2. Paste the contents of the TypeScript files in `src/` (can be multiple messages), or  
+3. Run the script below and paste the generated `parallel-sdk.d.ts`.
 
 ---
 
-## Local generator script (first-pass single-file .d.ts)
+## Option A: Generate it locally (recommended)
 
-This uses TypeScript’s compiler to emit declarations, then rolls them up. It won’t always preserve every comment perfectly across rollup tools, but it’s a good baseline.
-
-1) Ensure dependencies:
+### 1) Install deps
+From the repo root:
 
 ```bash
 npm i
-npm i -D typescript dts-bundle-generator
 ```
 
-2) Create `tools/build-dts.mjs`:
+### 2) Create `tools/build-single-dts.mjs`
+Create this file:
 
 ```js
-import { generateDtsBundle } from "dts-bundle-generator";
+// tools/build-single-dts.mjs
+import ts from "typescript";
 import fs from "node:fs";
 import path from "node:path";
 
 const repoRoot = process.cwd();
+const srcDir = path.join(repoRoot, "src");
+const outFile = path.join(repoRoot, "parallel-sdk.d.ts");
 
-// Try common entrypoints; adjust if your package exports a different module.
-const candidates = [
-  "src/index.ts",
-  "src/main.ts",
-  "src/client.ts",
-];
+function listTsFiles(dir) {
+  const out = [];
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, ent.name);
+    if (ent.isDirectory()) out.push(...listTsFiles(p));
+    else if (
+      ent.isFile() &&
+      (p.endsWith(".ts") || p.endsWith(".tsx")) &&
+      !p.endsWith(".d.ts")
+    ) out.push(p);
+  }
+  return out;
+}
 
-const entry = candidates
-  .map(p => path.join(repoRoot, p))
-  .find(p => fs.existsSync(p));
-
-if (!entry) {
-  console.error("Could not find an entry file. Please set entry manually in tools/build-dts.mjs");
+const files = listTsFiles(srcDir);
+if (!files.length) {
+  console.error(`No TS files found under ${srcDir}`);
   process.exit(1);
 }
 
-const outFile = path.join(repoRoot, "parallel-sdk.d.ts");
+const configPath = ts.findConfigFile(repoRoot, ts.sys.fileExists, "tsconfig.json");
 
-const [dts] = generateDtsBundle(
-  [{ filePath: entry }],
-  {
-    preferredConfigPath: path.join(repoRoot, "tsconfig.json"),
-    // Keep declarations fairly readable for LLMs:
-    exportReferencedTypes: true,
-    // Try to keep docs when possible:
-    // (Note: exact preservation depends on source + toolchain.)
-  }
-);
+// Prefer repo tsconfig if present; else use a sane default that emits d.ts
+let compilerOptions = {
+  target: ts.ScriptTarget.ES2020,
+  module: ts.ModuleKind.ESNext,
+  moduleResolution: ts.ModuleResolutionKind.Bundler,
+  declaration: true,
+  emitDeclarationOnly: true,
+  stripInternal: false,
+  skipLibCheck: true,
+  strict: false,
+  esModuleInterop: true,
+  resolveJsonModule: true,
+  baseUrl: repoRoot,
+};
 
-fs.writeFileSync(outFile, dts, "utf8");
-console.log("Wrote", outFile);
+if (configPath) {
+  const read = ts.readConfigFile(configPath, ts.sys.readFile);
+  const parsed = ts.parseJsonConfigFileContent(
+    read.config,
+    ts.sys,
+    repoRoot
+  );
+  compilerOptions = {
+    ...parsed.options,
+    declaration: true,
+    emitDeclarationOnly: true,
+    stripInternal: false,
+  };
+}
+
+const host = ts.createCompilerHost(compilerOptions);
+const dtsChunks = [];
+
+host.writeFile = (fileName, content) => {
+  // Collect all emitted .d.ts
+  if (fileName.endsWith(".d.ts")) dtsChunks.push({ fileName, content });
+};
+
+const program = ts.createProgram(files, compilerOptions, host);
+const emitResult = program.emit();
+
+const diagnostics = ts
+  .getPreEmitDiagnostics(program)
+  .concat(emitResult.diagnostics);
+
+if (diagnostics.length) {
+  const msg = ts.formatDiagnosticsWithColorAndContext(diagnostics, {
+    getCanonicalFileName: (f) => f,
+    getCurrentDirectory: () => repoRoot,
+    getNewLine: () => "\n",
+  });
+  console.error(msg);
+}
+
+// Naive concatenation in path order. Good enough for LLM “footprint” usage.
+// (We can topologically order later if needed.)
+dtsChunks.sort((a, b) => a.fileName.localeCompare(b.fileName));
+
+const banner = `// Consolidated Parallel SDK TypeScript declarations
+// Generated by tools/build-single-dts.mjs
+// Source: src/**
+
+// NOTE: This file is intended to expose the public API footprint to LLMs/tools.
+// It concatenates emitted declarations; doc-comments are preserved by TypeScript emit.
+`;
+
+const combined = banner + "\n" + dtsChunks.map(x => `// ---- ${x.fileName}\n${x.content}`).join("\n\n");
+fs.writeFileSync(outFile, combined, "utf8");
+console.log(`Wrote ${outFile}`);
 ```
 
-3) Run:
-
+### 3) Run it
 ```bash
-node tools/build-dts.mjs
+node tools/build-single-dts.mjs
 ```
 
-4) Paste `parallel-sdk.d.ts` back here, and I’ll:
-- verify it matches exports
-- correct any missing/incorrect shapes
-- **copy doc-comments 1:1** from the TS sources into the right declarations
-- ensure it’s a single coherent module surface (no broken `import()` types, etc.)
+This will write `parallel-sdk.d.ts` at the repo root.
+
+### 4) Send me `parallel-sdk.d.ts`
+Paste it here (or upload it). I can then:
+- de-duplicate/normalize `export {}` stubs,
+- ensure a clean single-module surface (if desired),
+- keep doc-comments **1:1** (no edits),
+- optionally add an `declare module "parallel-sdk"` wrapper if you want it “drop-in”.
 
 ---
 
-## One key question (so I generate the right module shape)
+## Option B: If you want me to do it entirely here
 
-How do you want consumers to import it?
-
-1. `import { Parallel } from "parallel-sdk";` style (named exports), or  
-2. `import Parallel from "parallel-sdk";` style (default export), or  
-3. Both.
-
-If you’re not sure, paste `package.json` (especially `exports`, `main`, `types`) and the `src/index.ts` (or equivalent entry).
+Upload a zip of `src/` and (if present) `tsconfig.json` + `package.json`. I’ll return a single `.d.ts` that summarizes the whole exported API footprint.
 
 ---
 
-## Send me this and I’ll return the final single `.d.ts`
+## Quick clarification (so the output matches your goal)
+Do you want the consolidated `.d.ts` to be:
 
-Minimum set to paste:
+1) **“As-emitted”** (concatenated declarations with original module paths), or  
+2) Wrapped as **one top-level module** like:
+```ts
+declare module "parallel-sdk" { ... }
+```
 
-- `src/index.ts` (or whatever entry file is exported)
-- any files it re-exports publicly
-- `package.json`
-- `tsconfig.json` (optional but helpful)
-
-Once I have that, I’ll generate the single `.d.ts` in one response.
+Reply with **1 or 2**, and share the code (zip/paste or generated file).
