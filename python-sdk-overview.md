@@ -1,48 +1,37 @@
-I can do this, but I can’t access that URL from here (no live browsing). If you paste the package source (or upload a zip / paste the files under `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that captures the public API surface and copies docstrings 1:1.
+I can, but I can’t directly fetch or browse that uithub link from here. If you paste the repository contents (or just the `src/parallel/` package files) or upload a zip, I’ll generate a single consolidated `parallel.pyi` stub for the whole public API and copy docstrings over verbatim.
 
-In the meantime, here are two options:
+In the meantime, here’s what I need and what you’ll get:
 
-## Option A (best): you paste the code here
-Please paste:
-- `src/parallel/__init__.py`
-- all modules in `src/parallel/` (and subpackages)
+## What I need from you
+One of:
+1) Upload a zip of the repo (or at least `src/parallel/`), or  
+2) Paste the full contents of all `*.py` files under `src/parallel/`, or  
+3) Give me the raw file contents for each path under `src/parallel/` (e.g., `__init__.py`, clients, models, etc.)
 
-Then I’ll return one monolithic `.pyi` with:
-- all exported symbols
-- classes/functions/overloads
-- type aliases/TypedDicts/enums/protocols
-- doc-comments copied verbatim where present (module/class/function docstrings)
+## What I will produce
+- A **single** `parallel.pyi` that:
+  - Includes the **entire** API footprint across modules (classes, functions, constants, TypedDicts, enums, dataclasses, protocols, etc.)
+  - Preserves **docstrings 1:1** (no edits) as triple-quoted strings in the stub
+  - Resolves and inlines re-exports from `parallel/__init__.py` so an LLM can “see” the surface area in one file
+  - Uses standard typing imports (`typing`, `typing_extensions`) and stubs for external types as needed
 
-## Option B: you generate a single “source bundle” locally
-Run this in the repo root and paste the resulting file content back here:
+## Quick checklist (so you can paste efficiently)
+Run this locally and paste the output:
 
 ```bash
 python - <<'PY'
 import os, pathlib
-
 root = pathlib.Path("src/parallel")
-out = []
-for path in sorted(root.rglob("*.py")):
-    rel = path.relative_to(root.parent)
-    out.append(f"\n# --- FILE: {rel} ---\n")
-    out.append(path.read_text(encoding="utf-8"))
-print("".join(out))
+for p in sorted(root.rglob("*.py")):
+    print("\n" + "="*80)
+    print(str(p))
+    print("="*80)
+    print(p.read_text(encoding="utf-8"))
 PY
 ```
 
-Then I’ll transform that into a single `.pyi`.
+Then I’ll return a consolidated `.pyi`.
 
 ---
 
-### If you want to create the `.pyi` automatically (local script)
-If you prefer, I can also provide a script that:
-1) walks the package,
-2) parses AST,
-3) extracts signatures & docstrings,
-4) emits a consolidated `.pyi`.
-
-But I still need the actual source to ensure it matches the repository exactly and to copy docstrings 1:1.
-
----
-
-Send the `src/parallel/` contents (Option A or B) and I’ll produce the unified `parallel.pyi`.
+If you upload/paste the code, I’ll generate the actual `parallel.pyi` immediately.
