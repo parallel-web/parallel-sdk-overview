@@ -1,60 +1,47 @@
-I can, but I can’t directly fetch that repo from the link in this chat environment. If you paste (or upload) the contents of `src/` (or just give me a zip / list of files + their contents), I’ll generate a single consolidated `index.d.ts` that summarizes the public API surface and preserves doc-comments 1:1.
+I can, but I can’t access that URL from here (no network/browsing in this chat). If you paste the repository contents (or upload a zip), I’ll generate a single consolidated `parallel-sdk.d.ts` that summarizes the full public API surface and preserves doc-comments **1:1**.
 
-Here are two easy ways to proceed:
+### What I need from you (pick one)
+1) **Upload a zip** of `src/` (best), or  
+2) Paste:
+- `src/index.ts` (or the entry file referenced by `package.json` `exports`/`main`/`types`)
+- all exported modules under `src/` (anything that is re-exported)
+- any `.ts` files containing public classes/types/interfaces/functions
 
-## Option A (fastest): paste the files
-1. Copy the contents of all `.ts` files under `src/` (or at least the public entrypoints like `src/index.ts` plus anything it exports).
-2. Paste them here in chunks.
-3. Tell me the package name (if you want it wrapped in `declare module "…" {}`).
+### If you prefer to generate it locally (and send me the output)
+Run this in the repo root:
 
-## Option B: run a script locally and paste the output
-If you can run Node locally, this script will concatenate the `src` tree (preserving comments) into one text blob you can paste here:
+```bash
+# 1) Ensure dependencies installed
+npm i
 
-```js
-// save as dump-src.mjs, run: node dump-src.mjs > src_dump.txt
-import fs from "node:fs";
-import path from "node:path";
-
-const root = path.resolve(process.argv[2] ?? "src");
-
-function walk(dir) {
-  const out = [];
-  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-    const p = path.join(dir, ent.name);
-    if (ent.isDirectory()) out.push(...walk(p));
-    else if (ent.isFile() && p.endsWith(".ts")) out.push(p);
-  }
-  return out.sort();
-}
-
-const files = walk(root);
-for (const f of files) {
-  const rel = path.relative(process.cwd(), f);
-  const txt = fs.readFileSync(f, "utf8");
-  process.stdout.write(`\n\n// ===== FILE: ${rel} =====\n`);
-  process.stdout.write(txt);
-}
+# 2) Generate .d.ts files
+npx tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir .dts-tmp
 ```
 
-Then upload/paste `src_dump.txt` here.
+Then either:
+- upload `.dts-tmp/` (or zip it), or
+- run a bundler to make it single-file (example with API Extractor):
 
----
+```bash
+npm i -D @microsoft/api-extractor
+npx api-extractor init
+# configure entryPointFilePath to .dts-tmp/index.d.ts (or your actual entry)
+npx api-extractor run --local
+```
 
-## What I will produce
-Once I have the sources, I’ll output a **single `.d.ts` file** that:
+Upload the resulting rolled-up `.d.ts` (often in `dist/*.d.ts` or `temp/*.d.ts`) and I’ll verify/clean it into a single “LLM-friendly” footprint file.
 
-- Includes **all exported types/classes/functions/constants** reachable from the package public entrypoints.
-- Preserves **doc-comments exactly 1:1** (I’ll copy them verbatim; no rewording).
-- Collapses implementation into type signatures (e.g., method bodies removed).
-- Keeps module structure either:
-  - **flat** (single global declarations), or
-  - wrapped as `declare module "parallel-sdk" { ... }` (your choice).
+### What I will produce
+A single `parallel-sdk.d.ts` that:
+- exposes the same public exports as the package entrypoint(s)
+- flattens/re-exports into one file (no relative imports)
+- preserves **all doc-comments exactly** (copied 1:1 where present)
+- keeps type names and signatures intact
+- excludes private/internal-only types unless they leak into public signatures
 
----
+### Quick clarifying question
+Do you want the `.d.ts` to reflect:
+- **only the public npm package surface** (recommended), or
+- **everything in `src/`**, even if not exported?
 
-## Quick questions (so I generate the right shape)
-1. What is the intended import path? e.g. `"@parallel/sdk"` or `"parallel-sdk-typescript"`?
-2. Do you want **only the public API** (exports), or literally every file/type in `src/` even if not exported?
-3. Is it ESM-only, or should I emit both default + named export patterns if they exist?
-
-Send the `src/` contents (Option A) or the dump (Option B), and I’ll generate the consolidated `.d.ts`.
+Send the files (or zip) and your preference, and I’ll generate the single consolidated `.d.ts`.

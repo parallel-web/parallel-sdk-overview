@@ -1,42 +1,62 @@
-I can do this, but I can’t directly fetch or browse that GitHub URL from here. If you paste the source tree contents (or upload a zip / paste the files under `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that summarizes the public API footprint and will copy docstrings/comments 1:1 wherever they appear.
+I can, but I can’t access that URL directly from here. If you paste (or upload) the contents of the `src/parallel/` package (all `.py` files), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API surface and preserves docstrings 1:1.
 
-To make this easy, here are two options:
+In the meantime, here are two practical options:
 
-## Option A (best): upload a zip
-Zip the `src/parallel/` folder and upload it here.
+1) **You paste code here** (best for smaller repos).
+2) **You generate a tar/zip or a single text dump** of `src/parallel/**.py` and upload it.
 
-## Option B: paste files (quick)
-Paste the contents of each `.py` file under `src/parallel/` (including `__init__.py`) into this chat.
+---
 
-## Option C: I give you a script to generate a bundle to paste
-Run this from the repo root; it prints all Python files in deterministic order so you can paste the output:
+## If you want to generate the dump locally
+
+From your repo root:
 
 ```bash
 python - <<'PY'
-from pathlib import Path
+import pathlib
 
-root = Path("src/parallel")
-files = sorted(p for p in root.rglob("*.py") if p.is_file())
+root = pathlib.Path("src/parallel")
+files = sorted(root.rglob("*.py"))
+
 for p in files:
-    rel = p.relative_to(root.parent)
-    print("\n" + "="*80)
-    print(f"# FILE: {rel}")
-    print("="*80)
+    print("\n" + "#"*80)
+    print(f"# FILE: {p.as_posix()}")
+    print("#"*80)
     print(p.read_text(encoding="utf-8"))
 PY
 ```
 
-Once I have the code, I will:
-- Produce a **single** `parallel.pyi` representing the package surface area.
-- Include **all public classes, functions, constants, exceptions**, and key method signatures.
-- Preserve doc-comments/docstrings **verbatim (1:1)** wherever present (typically as triple-quoted strings in the stub).
-- Add imports/typing constructs needed for correctness.
-- Prefer accurate types from annotations; otherwise infer conservative types (`Any`, `Optional[Any]`, `Mapping[str, Any]`, etc.).
-- Re-export anything exposed via `parallel/__init__.py`.
+Copy/paste the output here.
 
-### One question before I generate it
-Do you want the `.pyi` to reflect:
-1) **Only what’s publicly exported** (`__all__` / `__init__.py` re-exports), or  
-2) **Everything public-looking** (all non-underscore names across modules)?
+Or zip it:
 
-Reply with (1) or (2) and provide the code (via A/B/C).
+```bash
+zip -r parallel_src.zip src/parallel
+```
+
+Upload `parallel_src.zip`.
+
+---
+
+## What I will produce
+
+A single `parallel.pyi` that:
+
+- Includes **all public classes/functions/constants** exported by the package
+- Adds **type signatures** (using existing hints where present; otherwise best-effort safe `Any`)
+- Preserves **docstrings/comments 1:1** (copied exactly as found)
+- Includes relevant `__all__` if present, and mirrors re-exports
+
+---
+
+## One clarification
+
+Should the `.pyi` represent:
+- **Only the public API** (what’s imported from `parallel` / in `__all__`), or
+- **Everything in the package** (including internal/private `_foo`)?
+
+If you don’t specify, I’ll default to **public API only**, but still include internals when they are clearly user-facing.
+
+---
+
+Send the source (paste or upload) and tell me “public-only” vs “everything”, and I’ll return the single `.pyi` file.
