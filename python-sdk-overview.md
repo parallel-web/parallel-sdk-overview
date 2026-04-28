@@ -1,62 +1,31 @@
-I can, but I can’t access that URL directly from here. If you paste (or upload) the contents of the `src/parallel/` package (all `.py` files), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API surface and preserves docstrings 1:1.
+I can do that, but I can’t directly fetch URLs from uithub/GitHub from within this chat. If you paste the repository contents (or upload the `src/parallel` directory as a zip, or paste each `.py` file here), I’ll generate a single consolidated `parallel.pyi` stub that summarizes the full public API footprint and will copy docstrings/comments 1:1 where present.
 
-In the meantime, here are two practical options:
+To make this easy, here are two good options:
 
-1) **You paste code here** (best for smaller repos).
-2) **You generate a tar/zip or a single text dump** of `src/parallel/**.py` and upload it.
+## Option A (best): Upload a zip
+1. Zip the `src/parallel` folder.
+2. Upload it here.
+3. Tell me whether you want the output file named `parallel.pyi` or `parallel_sdk.pyi`.
 
----
-
-## If you want to generate the dump locally
-
-From your repo root:
-
-```bash
-python - <<'PY'
-import pathlib
-
-root = pathlib.Path("src/parallel")
-files = sorted(root.rglob("*.py"))
-
-for p in files:
-    print("\n" + "#"*80)
-    print(f"# FILE: {p.as_posix()}")
-    print("#"*80)
-    print(p.read_text(encoding="utf-8"))
-PY
-```
-
-Copy/paste the output here.
-
-Or zip it:
-
-```bash
-zip -r parallel_src.zip src/parallel
-```
-
-Upload `parallel_src.zip`.
+## Option B: Paste the files
+Paste the contents of every `.py` file under `src/parallel` (including `__init__.py`). If it’s large, do it in multiple messages.
 
 ---
 
 ## What I will produce
-
-A single `parallel.pyi` that:
-
-- Includes **all public classes/functions/constants** exported by the package
-- Adds **type signatures** (using existing hints where present; otherwise best-effort safe `Any`)
-- Preserves **docstrings/comments 1:1** (copied exactly as found)
-- Includes relevant `__all__` if present, and mirrors re-exports
-
----
-
-## One clarification
-
-Should the `.pyi` represent:
-- **Only the public API** (what’s imported from `parallel` / in `__all__`), or
-- **Everything in the package** (including internal/private `_foo`)?
-
-If you don’t specify, I’ll default to **public API only**, but still include internals when they are clearly user-facing.
+A single `.pyi` file that:
+- Includes all public modules/classes/functions/attributes exposed by the package.
+- Preserves docstrings exactly (verbatim) wherever present (module, class, method, function docstrings).
+- Includes type signatures (from annotations if present; otherwise best-effort using common patterns).
+- Includes `__all__`-driven exports and re-exports from `__init__.py`.
+- Uses `typing` constructs (`Protocol`, `TypedDict`, `Literal`, `overload`, etc.) when appropriate.
 
 ---
 
-Send the source (paste or upload) and tell me “public-only” vs “everything”, and I’ll return the single `.pyi` file.
+## One quick question (so I match your intent)
+Do you want the stub to reflect:
+1) **Only the public API** (things imported/exported via `parallel/__init__.py` and/or in `__all__`),  
+or  
+2) **Everything in `src/parallel`**, including internal modules/classes?
+
+Reply with “public only” or “everything”, and upload/paste the code.

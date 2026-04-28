@@ -1,47 +1,26 @@
-I can, but I can’t access that URL from here (no network/browsing in this chat). If you paste the repository contents (or upload a zip), I’ll generate a single consolidated `parallel-sdk.d.ts` that summarizes the full public API surface and preserves doc-comments **1:1**.
+I can do that, but I can’t directly fetch or browse that GitHub URL from here. If you paste (or upload) the contents of the repo’s `src/` directory (or a zip of it), I’ll generate a single consolidated `index.d.ts` that summarizes the public API footprint and preserves doc-comments **verbatim**.
 
-### What I need from you (pick one)
-1) **Upload a zip** of `src/` (best), or  
-2) Paste:
-- `src/index.ts` (or the entry file referenced by `package.json` `exports`/`main`/`types`)
-- all exported modules under `src/` (anything that is re-exported)
-- any `.ts` files containing public classes/types/interfaces/functions
+### What I need from you
+Pick one:
 
-### If you prefer to generate it locally (and send me the output)
-Run this in the repo root:
-
-```bash
-# 1) Ensure dependencies installed
-npm i
-
-# 2) Generate .d.ts files
-npx tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir .dts-tmp
-```
-
-Then either:
-- upload `.dts-tmp/` (or zip it), or
-- run a bundler to make it single-file (example with API Extractor):
-
-```bash
-npm i -D @microsoft/api-extractor
-npx api-extractor init
-# configure entryPointFilePath to .dts-tmp/index.d.ts (or your actual entry)
-npx api-extractor run --local
-```
-
-Upload the resulting rolled-up `.d.ts` (often in `dist/*.d.ts` or `temp/*.d.ts`) and I’ll verify/clean it into a single “LLM-friendly” footprint file.
+1. **Upload a zip** of `src/` (preferred), or  
+2. **Paste all TypeScript files** under `src/` (including `index.ts`/barrels), or  
+3. If you have it locally, run one of these and paste the output:
+   - `tar -czf src.tgz src && ls -lh src.tgz` then upload `src.tgz`, or
+   - `zip -r src.zip src` then upload `src.zip`.
 
 ### What I will produce
-A single `parallel-sdk.d.ts` that:
-- exposes the same public exports as the package entrypoint(s)
-- flattens/re-exports into one file (no relative imports)
-- preserves **all doc-comments exactly** (copied 1:1 where present)
-- keeps type names and signatures intact
-- excludes private/internal-only types unless they leak into public signatures
+- A **single `.d.ts` file** (e.g., `parallel-sdk.d.ts`) containing:
+  - exported types/interfaces/classes/functions/constants
+  - module declarations if needed
+  - re-exports resolved into one place (as much as possible)
+  - **doc-comments copied 1:1** (no edits)
+- Any private/internal symbols will be omitted unless they are part of exported types.
 
-### Quick clarifying question
-Do you want the `.d.ts` to reflect:
-- **only the public npm package surface** (recommended), or
-- **everything in `src/`**, even if not exported?
+### If you want it to be especially LLM-friendly
+Tell me your preferred style:
+- **Flat** (everything in one namespace/module), or
+- **Mirrors package structure** (keeps modules but in one file), and
+- Whether to include **non-exported** types that are referenced transitively (sometimes useful for comprehension).
 
-Send the files (or zip) and your preference, and I’ll generate the single consolidated `.d.ts`.
+Send the `src/` contents (zip or text), and I’ll generate the single `.d.ts` file.
