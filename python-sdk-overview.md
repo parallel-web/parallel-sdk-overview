@@ -1,31 +1,49 @@
-I can do that, but I can’t directly fetch URLs from uithub/GitHub from within this chat. If you paste the repository contents (or upload the `src/parallel` directory as a zip, or paste each `.py` file here), I’ll generate a single consolidated `parallel.pyi` stub that summarizes the full public API footprint and will copy docstrings/comments 1:1 where present.
+I can, but I can’t directly fetch or browse that GitHub/uithub URL from here.
 
-To make this easy, here are two good options:
+If you paste either:
 
-## Option A (best): Upload a zip
-1. Zip the `src/parallel` folder.
-2. Upload it here.
-3. Tell me whether you want the output file named `parallel.pyi` or `parallel_sdk.pyi`.
+1) the contents of `src/parallel/` (all `.py` files), **or**  
+2) a single zip/tar of that folder, **or**  
+3) the output of `python -c "import pkgutil,parallel,inspect; ..."` (I can give you a script)
 
-## Option B: Paste the files
-Paste the contents of every `.py` file under `src/parallel` (including `__init__.py`). If it’s large, do it in multiple messages.
+…I’ll generate a single `parallel.pyi` that aggregates the whole public surface area and **copies docstrings 1:1**.
+
+### Fastest path (you run this, paste output)
+Run this at the repo root (after `pip install -e .` or with `PYTHONPATH=src`):
+
+```python
+# dump_parallel_sources.py
+import os, pathlib, textwrap
+
+root = pathlib.Path("src/parallel")
+for path in sorted(root.rglob("*.py")):
+    rel = path.relative_to(root.parent)
+    print("\n" + "="*120)
+    print(str(rel))
+    print("="*120)
+    print(path.read_text(encoding="utf-8"))
+```
+
+Then:
+
+```bash
+python dump_parallel_sources.py > parallel_sources.txt
+```
+
+Upload/paste `parallel_sources.txt` here.
+
+### Alternative (zip)
+Zip `src/parallel/` and upload it here.
 
 ---
 
-## What I will produce
-A single `.pyi` file that:
-- Includes all public modules/classes/functions/attributes exposed by the package.
-- Preserves docstrings exactly (verbatim) wherever present (module, class, method, function docstrings).
-- Includes type signatures (from annotations if present; otherwise best-effort using common patterns).
-- Includes `__all__`-driven exports and re-exports from `__init__.py`.
-- Uses `typing` constructs (`Protocol`, `TypedDict`, `Literal`, `overload`, etc.) when appropriate.
+Once I have the sources, I’ll return a **single** `.pyi` file that:
+- includes module-level exports, classes, functions, constants, exceptions
+- preserves docstrings exactly (triple-quoted in the stub) wherever present
+- resolves re-exports (`__init__.py`), so the stub reflects how users import things
+- uses `typing` constructs (overloads, Protocols, TypedDicts) when inferable
+- keeps signatures faithful (including default values when safe)
 
----
-
-## One quick question (so I match your intent)
-Do you want the stub to reflect:
-1) **Only the public API** (things imported/exported via `parallel/__init__.py` and/or in `__all__`),  
-or  
-2) **Everything in `src/parallel`**, including internal modules/classes?
-
-Reply with “public only” or “everything”, and upload/paste the code.
+Send the sources (or zip), and tell me if you want the stub organized as:
+- **one flat module** (`parallel.pyi` with everything), or
+- **one file with module sections** (still a single `.pyi`, but separated by comments like `# --- parallel.client ---`).
