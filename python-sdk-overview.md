@@ -1,34 +1,35 @@
-I can do that, but I can’t directly fetch or browse that GitHub/uithub URL from here.
+I can do this, but I can’t access that URL directly from here.
 
-If you paste the repository contents (or upload a zip / paste the files under `src/parallel/**`), I’ll generate a single consolidated `parallel.pyi` that mirrors the full public API surface and copies docstrings **1:1** where present.
+If you paste the contents of the package (or upload a zip / paste the key files), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API surface and copies docstrings 1:1 where present.
 
 ### What I need from you
-Any one of these options works:
+One of:
 
-1) **Upload a zip** of the repo (or just `src/parallel/`).
+1. **Upload** the repository or the `src/parallel/` directory contents (all `.py` files), or  
+2. **Paste** the file tree + file contents of everything under `src/parallel/`, or  
+3. Run this locally and paste the produced bundle:
 
-2) **Paste the file tree + contents** of everything under:
-- `src/parallel/__init__.py`
-- `src/parallel/**/*.py`
-
-3) If you can run a command locally and paste the output, this is easiest:
 ```bash
-python -c "import os, pathlib; p=pathlib.Path('src/parallel'); 
-print('\n'.join(str(x) for x in p.rglob('*.py')))"
+python - <<'PY'
+import os, pathlib
+
+root = pathlib.Path("src/parallel")
+for path in sorted(root.rglob("*.py")):
+    print("\n" + "="*80)
+    print(str(path))
+    print("="*80)
+    print(path.read_text(encoding="utf-8"))
+PY
 ```
-Then paste each file’s content (or I can tell you an automated way to dump them all at once).
 
-### What I will produce
-- A **single** `parallel.pyi` containing:
-  - all exported classes/functions/constants/types
-  - module-level `__all__` behavior (as best as can be inferred)
-  - method signatures with types (from annotations; otherwise best-effort `Any`)
-  - dataclasses / pydantic models / TypedDicts / Enums reflected appropriately
-  - async vs sync signatures preserved
-  - **docstrings copied exactly 1:1** into the `.pyi` (PEP 484 stubs allow docstrings)
+### What you’ll get
+- A **single** `.pyi` file representing the **public footprint** (classes, functions, constants, types).
+- **Doc-comments/docstrings copied verbatim** (1:1) wherever they exist (as `"""..."""` right under the stubbed symbol).
+- Re-export behavior handled (e.g., `__init__.py` exports) so the “seen” API matches actual imports.
 
-### Quick questions (optional, but helps)
-1) Do you want the stub to include **only public API** (imports in `parallel/__init__.py` + `__all__`), or **everything** in the package?
-2) Target Python version for typing features: `3.9`, `3.10`, `3.11+`?
+### Quick clarifying question (so I match your intent)
+Should the stub represent:
+- **Only the public API** (what you can import from `parallel` / submodules), or
+- **Everything in `src/parallel/**`**, including internal modules?
 
-If you paste/upload the code, I’ll return the single `.pyi` file content in one block.
+Reply with (A) or (B), and paste/upload the sources; I’ll generate the `.pyi`.
