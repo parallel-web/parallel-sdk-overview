@@ -1,54 +1,46 @@
-I can do this, but I can’t directly fetch that URL from here. If you paste (or upload) the contents of the `src/` directory (or a zip), I’ll generate a single consolidated `index.d.ts` that reflects the public API surface, and I’ll copy doc-comments 1:1.
+I can do that, but I can’t access external URLs from here, so I can’t read that repo directly.
 
-In the meantime, here are two quick ways to get me the exact inputs I need, and a note on what I’ll output.
+If you paste the contents of the `src/` directory (or upload a zip / tarball of it here), I’ll generate a **single consolidated `parallel-sdk.d.ts`** that summarizes the public API footprint, and I’ll **copy doc-comments 1:1** wherever they exist.
 
-## Option A (best): Zip the `src/` folder and upload it here
-1. Download the repo locally
-2. Zip `src/`
-3. Upload the zip in this chat
+### What I need from you
+Pick one:
 
-## Option B: Paste file contents (works if small)
-Paste the directory tree + contents of each `.ts` file under `src/` (including `index.ts` / barrel exports).
+1) **Upload** the repo (or just `src/`) as an attachment here, or  
+2) Paste:
+- `src/index.ts` (or whatever the main entrypoint is)
+- any exported modules/files it re-exports
+- any `.ts` files that define exported types/classes/functions
 
----
-
-## What I will produce
-A single `.d.ts` file that:
-- Mirrors the **publicly exported** types/classes/functions/constants from `src`
-- Preserves **JSDoc/doc comments exactly 1:1** where they exist
-- Inlines/re-exports everything into one file (no imports), so an LLM can read it as a complete API footprint
-- Uses `declare` types and namespaces only as needed
-- Keeps the same names and structure as the original exports (barrels respected)
-
----
-
-## If you want, you can generate the raw inputs automatically
-If you can run commands locally, this will produce the exact TypeScript sources in one pasteable blob:
+If you want to keep it minimal, you can run this and paste the output:
 
 ```bash
 # from repo root
-python - <<'PY'
-import os
-root="src"
-for dirpath, _, filenames in os.walk(root):
-    for fn in sorted(filenames):
-        if fn.endswith(".ts") and not fn.endswith(".d.ts"):
-            path=os.path.join(dirpath, fn)
-            print("\n" + "="*80)
-            print(path)
-            print("="*80)
-            with open(path, "r", encoding="utf-8") as f:
-                print(f.read())
-PY
+git ls-files "src/**/*.ts" "src/**/*.tsx" "src/**/*.d.ts"
 ```
 
-Paste the output here, and I’ll return the single consolidated `.d.ts`.
+and then paste the key files, starting with the entrypoint(s).
 
----
+### What I will produce
+- A single file, e.g. `parallel-sdk.d.ts`, containing:
+  - all exported types/interfaces/classes/functions/namespaces
+  - re-exports resolved into one place
+  - doc-comments copied **verbatim** (no edits)
+  - `export` surface matching the package’s public API as closely as possible
+- If the library has internal-only exports, I’ll exclude those unless they’re publicly exported from the entrypoint.
 
-## One clarification (so I match your goal)
+### If you prefer: you can generate inputs automatically
+If you can run commands locally, this produces a rolled-up `.d.ts` I can then “LLM-optimize” into a single readable footprint file:
+
+```bash
+npm i
+npx tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir /tmp/decls
+```
+
+Then upload `/tmp/decls` (or paste the generated `.d.ts` files), and I’ll merge them into one.
+
+### One quick clarifying question
 Do you want the `.d.ts` to reflect:
-1) **Only what the package exports publicly** (recommended for “API footprint”), or  
-2) **Everything in `src/` including internal/non-exported helpers**?
+- **Only the public entrypoint exports** (recommended), or
+- **Everything under `src/`** even if not exported?
 
-Reply with “1” or “2”, and upload/paste the files.
+Upload/paste the code and tell me which option you want, and I’ll generate the single consolidated `.d.ts`.
