@@ -1,50 +1,24 @@
-I can, but I can’t fetch that GitHub URL from here. If you paste the contents of `src/` (or upload a zip / paste key files), I’ll generate a single consolidated `parallel-sdk.d.ts` with all exported types/classes/functions and I’ll preserve doc-comments **1:1**.
+I can, but I can’t access that URL directly from here. If you paste the contents of `src/` (or upload a zip / tarball of the folder), I’ll generate a single consolidated `parallel-sdk.d.ts` that:
 
-Meanwhile, here’s the exact workflow and what I need:
+- Exports the full public surface (classes, functions, types, interfaces, namespaces, enums)
+- Preserves **all existing doc-comments 1:1** (copied verbatim, not rewritten)
+- Flattens/re-exports modules so an LLM can “see” the whole API in one file
+- Marks internal/private items as non-exported (unless they’re part of the public API)
 
-## What to send
-One of:
-1. **Upload** a zip/tar of `src/` (preferred), or  
-2. Paste:
-   - `src/index.ts` (or entrypoint)
-   - every `src/**/*.ts` file that exports anything (or all of them)
+### What I need from you
+Pick one:
 
-Also tell me:
-- the package name you want in the header (e.g. `parallel-sdk`)
-- whether to emit as `declare module "parallel-sdk"` wrapper (recommended for LLM ingestion) or as bare global declarations.
+1) **Upload** the repository (or just `src/`) as an attachment here, or  
+2) Paste:
+   - `src/**` TypeScript files
+   - `package.json`
+   - `tsconfig.json` (if present)
+   - `src/index.ts` (or whatever the entrypoint is)
 
-## What I will produce
-A **single** `.d.ts` file that:
-- Includes **all public exports** reachable from the entrypoint.
-- Inlines/re-exports types so the footprint is visible in one file.
-- Preserves **all doc-comments exactly** as in source (verbatim).
-- Uses `export` / `export type` / `export interface` / `export class` signatures matching the SDK.
-- Avoids implementation bodies (types only), but includes overloads and generics.
+### Quick check (so I export the right things)
+Also tell me which you want as the “public API” basis:
 
-## If you want to generate it locally (fastest) and paste here
-Run this in the repo root:
+- **A. Entry-point exports only** (recommended): only what `src/index.ts` (and its re-exports) exposes  
+- **B. Everything under `src/`**: even internal modules
 
-```bash
-npm i
-npx tsc -p . --declaration --emitDeclarationOnly --outFile parallel-sdk.d.ts
-```
-
-If `outFile` doesn’t work due to module settings, use:
-
-```bash
-npx api-extractor run --local --verbose
-```
-
-or:
-
-```bash
-npx dts-bundle-generator -o parallel-sdk.d.ts src/index.ts
-```
-
-Then paste the generated `parallel-sdk.d.ts` here and I’ll:
-- clean it up for LLM readability (while keeping comments 1:1),
-- ensure the “surface area” is complete,
-- optionally add an export map section at the top (no changes to original doc comments).
-
-## Next step
-Paste the `src/index.ts` (or whatever the main entry file is) and I’ll start assembling the unified `.d.ts` immediately.
+Reply with the files + A or B, and I’ll return a single `.d.ts` file.
