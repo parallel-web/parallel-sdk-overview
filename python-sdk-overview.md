@@ -1,41 +1,142 @@
-I can do that, but I can’t directly fetch or read that GitHub/uithub URL from here. If you paste the contents of the `src/parallel/` package (or upload the folder / a zip), I’ll generate a single consolidated `parallel.pyi` that summarizes the public API surface and will copy docstrings/comments 1:1 where present.
+I can, but I can’t directly fetch that repo from the URL in this environment. If you paste (or upload) the package source (the `src/parallel/` directory) or a zip/tar of the repo, I’ll generate a single consolidated `parallel.pyi` that covers the full public footprint and copies docstrings 1:1.
 
-To make this easy, here are two options:
-
-## Option A (preferred): upload a zip
-1. Zip the `src/parallel/` directory.
-2. Upload it here.
-3. Tell me the desired output filename (e.g., `parallel_sdk.pyi` or `parallel.pyi`).
-
-## Option B: paste files (works fine for smaller packages)
-Paste the contents of each `.py` file under `src/parallel/` (including `__init__.py`) in separate code blocks, with the path as a header.
+Meanwhile, here’s the exact approach I’ll use, and a ready-to-run script you can run locally to generate the single-file `.pyi` automatically from that repo—then you can send me the generated `.pyi` for review/tweaks if you want.
 
 ---
 
-## What I will produce
-A **single** `.pyi` file that:
-- Includes all exported classes/functions/constants/types from the package.
-- Preserves **existing docstrings/doc-comments exactly** (copied 1:1; no edits).
-- Adds type signatures inferred from annotations when present; otherwise uses `Any`.
-- Represents re-exports in `__init__.py` so an LLM sees the effective API footprint.
-- Avoids implementation bodies (stub style).
+## Option A (fastest): Run this generator locally
 
----
-
-## If you want to generate it locally (optional)
-If you’d rather not paste/upload, you can run this and paste the output tar/zip here:
-
+### 1) Install deps
 ```bash
-python -c "import os,zipfile; \
-base='src/parallel'; \
-z=zipfile.ZipFile('parallel_src.zip','w'); \
-[ z.write(os.path.join(r,f), os.path.join(r,f)) \
-  for r,_,fs in os.walk(base) for f in fs if f.endswith('.py') ]; \
-z.close(); print('Wrote parallel_src.zip')"
+python -m pip install "mypy>=1.8" "stubgenj>=0.2" || true
 ```
 
-Upload `parallel_src.zip` and I’ll do the rest.
+`stubgen` comes with mypy; `stubgenj` is optional (ignore if it fails). If `stubgenj` fails, that’s fine.
+
+### 2) Generate stubs using mypy’s stubgen
+From the repo root (where `src/parallel` exists):
+
+```bash
+python -m mypy.stubgen -p parallel -o _stubs_out --include-docstrings
+```
+
+This produces `_stubs_out/parallel/**/*.pyi`.
+
+### 3) Collapse all generated `.pyi` into one `parallel.pyi`
+
+Save as `combine_stubs.py`:
+
+```python
+from __future__ import annotations
+
+import os
+import re
+from pathlib import Path
+
+ROOT = Path("_stubs_out") / "parallel"
+OUT = Path("parallel.pyi")
+
+def iter_pyi_files(root: Path) -> list[Path]:
+    files = []
+    for p in root.rglob("*.pyi"):
+        # ignore private caches etc.
+        if "__pycache__" in p.parts:
+            continue
+        files.append(p)
+    # deterministic order: package __init__ first, then modules by path
+    files.sort(key=lambda p: (0 if p.name == "__init__.pyi" else 1, str(p)))
+    return files
+
+def strip_future_imports(text: str) -> str:
+    # Keep only one future import at top-level later
+    text = re.sub(r"^from __future__ import .*\n", "", text, flags=re.MULTILINE)
+    return text
+
+def normalize_relative_imports(text: str, module_qualname: str) -> str:
+    """
+    In a single-file stub, relative imports are meaningless.
+    Replace simple relative imports with absolute where possible,
+    otherwise leave a comment.
+    """
+    lines = []
+    for line in text.splitlines(True):
+        m = re.match(r"^\s*from\s+(\.+)([\w\.]*)\s+import\s+(.*)$", line)
+        if not m:
+            lines.append(line)
+            continue
+        dots, tail, rest = m.group(1), m.group(2), m.group(3)
+        # Compute absolute module prefix based on dots count
+        parts = module_qualname.split(".")
+        up = len(dots)
+        if up > len(parts):
+            lines.append(f"# [unresolved relative import in {module_qualname}]: {line}")
+            continue
+        base = parts[:-up]
+        abs_mod = ".".join(["parallel", *base[1:], tail] if base and base[0] == "parallel" else [*base, tail])
+        abs_mod = abs_mod.strip(".")
+        if not abs_mod:
+            lines.append(f"# [unresolved relative import in {module_qualname}]: {line}")
+        else:
+            lines.append(f"from {abs_mod} import {rest}\n")
+    return "".join(lines)
+
+def qualify_module(path: Path) -> str:
+    rel = path.relative_to(ROOT)
+    if rel.name == "__init__.pyi":
+        mod_parts = rel.parent.parts
+    else:
+        mod_parts = (*rel.parent.parts, rel.stem)
+    return ".".join(("parallel", *mod_parts)) if mod_parts else "parallel"
+
+def main() -> None:
+    files = iter_pyi_files(ROOT)
+
+    out_parts: list[str] = []
+    out_parts.append("# This file is auto-generated by combine_stubs.py\n")
+    out_parts.append("from __future__ import annotations\n\n")
+
+    for p in files:
+        mod = qualify_module(p)
+        text = p.read_text(encoding="utf-8")
+        text = strip_future_imports(text)
+        text = normalize_relative_imports(text, mod)
+
+        out_parts.append("\n")
+        out_parts.append("#" * 88 + "\n")
+        out_parts.append(f"# Module: {mod}  (source: {p.as_posix()})\n")
+        out_parts.append("#" * 88 + "\n")
+        out_parts.append(text.rstrip() + "\n")
+
+    OUT.write_text("".join(out_parts), encoding="utf-8")
+    print(f"Wrote {OUT} ({OUT.stat().st_size} bytes)")
+
+if __name__ == "__main__":
+    main()
+```
+
+Run:
+```bash
+python combine_stubs.py
+```
+
+You’ll get a single `parallel.pyi`.
 
 ---
 
-Send me the package contents (zip or pasted files) and I’ll return the consolidated `.pyi`.
+## Option B: I generate it for you (you provide the code)
+Upload either:
+- a zip of the repo, or
+- just `src/parallel/**.py` (and any `py.typed`, etc.)
+
+Then I’ll produce:
+- `parallel.pyi` (single file, consolidated)
+- notes about any dynamically-defined exports that can’t be perfectly inferred
+- verification that docstrings were copied 1:1 (when present / extractable)
+
+---
+
+## A couple of questions (so I generate the right “footprint”)
+1) Do you want *only public API* (what’s re-exported from `parallel/__init__.py`), or *everything* under `src/parallel` including internal modules?
+2) Should the single `.pyi` preserve module boundaries as commented sections (as in the script), or should it flatten everything into one namespace?
+
+Send the source (or the generated stub), answer those two questions, and I’ll return the final single `.pyi`.

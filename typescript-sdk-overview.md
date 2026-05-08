@@ -1,29 +1,30 @@
-I can do that, but I can’t access external URLs from here, so I can’t read that repo directly.
-
-If you paste the contents of the `src/` folder (or upload a zip / provide the files here), I’ll generate a **single consolidated `index.d.ts`** that summarizes the public API surface. I’ll also **copy doc-comments 1:1** exactly as written (including formatting), and I’ll avoid “improving” or rewording them.
+I can do that, but I can’t fetch URLs directly from here. If you paste the contents of the `src/` tree (or upload a zip / paste files), I’ll generate a single consolidated `index.d.ts` that summarizes the public API surface.
 
 ### What I need from you
-Pick one of these:
+Provide **either**:
 
-1) **Paste file tree + file contents**  
-   - `src/**/*.ts` (and any existing `*.d.ts`)  
-   - plus `package.json` and `tsconfig.json` if available (helps resolve exports/types)
+1. **A zip** of `src/` (best), or  
+2. The output of one of these commands:
 
-2) **Paste just the public entrypoints** (faster)  
-   - whatever `package.json` points to (`main`, `module`, `types`, `exports`)  
-   - and any `src/index.ts` / `src/public.ts` / barrel files they re-export from
+```bash
+# Option A: print all TS files (mac/linux)
+find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print -exec sed -n '1,20000p' {} \;
+
+# Option B: tarball (then paste binary not ideal; better upload)
+tar -czf src.tgz src
+```
+
+Or just paste the files in chunks.
 
 ### What I will produce
-- A **single** `parallel-sdk-typescript.d.ts` (or `index.d.ts`) containing:
-  - all exported types/classes/functions/interfaces/enums
-  - namespaces/modules if used
-  - re-export resolution (flattened into one file)
-  - doc comments copied **verbatim** (no edits)
-- I’ll keep internal/private items out unless they’re part of the exported API.
+- A **single `.d.ts` file** (e.g. `parallel-sdk.d.ts`) that:
+  - Preserves **JSDoc/doc-comments 1:1** wherever they exist (I’ll copy them verbatim).
+  - Exposes the **public footprint**: exported types, interfaces, classes, functions, namespaces, modules, and re-exports.
+  - Flattens/organizes exports so an LLM can quickly understand usage.
+  - Includes type-only imports as needed, but avoids implementation.
 
-### Quick question (so I format it correctly)
-Do you want the output shaped as:
-- **Global `declare module "parallel-sdk"`** style (best for LLM “overview”), or
-- **Standard `.d.ts` with `export ...`** matching the package’s real module name(s)?
+### A couple quick clarifying questions (optional)
+1. Do you want the `.d.ts` to reflect **only what’s exported from the package entrypoint** (e.g. `src/index.ts`), or **everything under `src/` even if not exported**?
+2. What should the output module name be (e.g. `declare module "@parallel-web/sdk"`), or should it be “ambient-free” (just normal exports)?
 
-If you paste the files here, I’ll start immediately.
+Send the `src` contents and I’ll generate the consolidated `.d.ts`.
