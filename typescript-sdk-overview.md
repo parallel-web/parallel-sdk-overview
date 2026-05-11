@@ -1,19 +1,13 @@
-I can do this, but I can’t directly fetch URLs from GitHub/uithub in this chat. If you paste the contents of that `src/` directory (or upload a zip / paste key files), I’ll generate a single consolidated `index.d.ts` with the public API surface and copy doc-comments 1:1.
+I can, but I can’t directly fetch that URL from here. If you paste (or upload) the contents of `src/` (or a zip of the repo, or the key `.ts` files), I’ll generate a single consolidated `index.d.ts` that mirrors the exported public API and **copies doc-comments 1:1** wherever they exist.
 
-In the meantime, here are two practical ways to get me the exact inputs I need, plus a ready-to-use script that will generate a single `.d.ts` from the repo on your machine (and optionally bundle it). If you run it and paste the resulting file here, I can also verify/clean it and ensure the footprint is “LLM-readable”.
+In the meantime, here’s exactly what I will produce and how you can generate it locally right now (so you don’t have to paste anything), plus a small post-processing script that collapses it into **one** `.d.ts` file.
 
 ---
 
-## Option A (best): generate a single `.d.ts` locally and paste it here
+## Option A (recommended): Generate one .d.ts from the repo locally
 
-### 1) Build TypeScript declarations
-From the repo root:
-
-```bash
-npm i
-```
-
-Ensure `tsconfig.json` has (or temporarily add):
+### 1) Ensure `tsconfig.json` emits declarations
+In the repo root, create/adjust `tsconfig.json` (or `tsconfig.build.json`) to include:
 
 ```json
 {
@@ -22,23 +16,32 @@ Ensure `tsconfig.json` has (or temporarily add):
     "emitDeclarationOnly": true,
     "declarationMap": false,
     "stripInternal": false,
-    "outDir": "dist-types"
+    "removeComments": false,
+    "outDir": "dist-types",
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "skipLibCheck": true
   },
   "include": ["src"]
 }
 ```
 
-Then run:
+Notes:
+- `removeComments: false` is important so JSDoc can be preserved.
+- Some tooling strips comments anyway; we’ll address that with the bundling step.
 
+### 2) Build declarations
 ```bash
 npx tsc -p tsconfig.json
 ```
 
-This outputs many `.d.ts` files under `dist-types/`.
+This creates `dist-types/**/*.d.ts`.
 
-### 2) Bundle into a single `parallel-sdk.d.ts`
-Install API Extractor (Microsoft’s tool for exactly this):
+### 3) Bundle them into a single `.d.ts`
+Use `@microsoft/api-extractor` (best at preserving API shape) or `dts-bundle-generator`.
 
+#### Using API Extractor
 ```bash
 npm i -D @microsoft/api-extractor
 ```
@@ -57,42 +60,42 @@ Create `api-extractor.json`:
   "docModel": { "enabled": false },
   "messages": {
     "compilerMessageReporting": { "default": { "logLevel": "none" } },
-    "extractorMessageReporting": { "default": { "logLevel": "warning" } },
+    "extractorMessageReporting": { "default": { "logLevel": "none" } },
     "tsdocMessageReporting": { "default": { "logLevel": "none" } }
   }
 }
 ```
 
 Run:
-
 ```bash
 npx api-extractor run --local
 ```
 
-Now you’ll have `parallel-sdk.d.ts`. Paste that file here and I’ll:
-- ensure it reflects the full exported API footprint (no private internals),
-- preserve doc-comments 1:1,
-- optionally reformat to maximize “LLM readability” (without changing content).
+You’ll get a single file: `parallel-sdk.d.ts`.
 
 ---
 
-## Option B: paste source files (or just the public entrypoints)
+## Option B: If you want me to generate it here
 
-If you can’t run tools, paste:
-- `src/index.ts` (or whatever the package’s main entry is),
-- any files it exports from (often `src/client.ts`, `src/resources/*`, `src/types.ts`, etc.),
-- and `package.json` (to find `main` / `exports`).
+Send one of these:
+1) A zip of the repo, or  
+2) The `src/` folder contents (all `.ts` files), plus `package.json` and any `tsconfig*.json`, or  
+3) The output of `tree src` and then paste each file.
 
-With that, I can manually synthesize a single `.d.ts` that mirrors the exports.
+Then I’ll return a single `.d.ts` that:
+- Includes the full exported surface area (classes, functions, types, interfaces, enums, namespaces).
+- Keeps module structure if needed (or flattens to top-level exports—your choice).
+- Copies **doc-comments 1:1** exactly as in source (no edits).
+- Resolves re-exports so an LLM can understand the full footprint in one view.
 
 ---
 
-## What I need from you
+## Quick questions (so the output matches what you want)
 
-Reply with **one** of the following:
+1) Should the final file be **module-based** (e.g. `declare module "@parallel-web/sdk" { ... }`) or just plain exports (`export *`)?
+2) What’s the package name you want in the `declare module "..."` wrapper (from `package.json:name`)?
+3) Do you want internal-only types included if they’re exported indirectly, or strictly the public exports from the package entrypoint?
 
-1) **Paste `parallel-sdk.d.ts`** produced by the steps above, **or**
-2) Upload/paste the `src/` tree contents (or a zip), **or**
-3) Tell me the package entrypoint file (`package.json` `exports`/`main`) and paste those exported modules.
+---
 
-Once I have the code/declarations, I’ll return a single consolidated `.d.ts` file and nothing else (unless you ask for extras).
+If you upload/paste the `src/` files (or a zip), I’ll produce the single consolidated `.d.ts` in my next message.
