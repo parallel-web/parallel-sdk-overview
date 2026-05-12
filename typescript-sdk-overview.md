@@ -1,101 +1,46 @@
-I can, but I can’t directly fetch that URL from here. If you paste (or upload) the contents of `src/` (or a zip of the repo, or the key `.ts` files), I’ll generate a single consolidated `index.d.ts` that mirrors the exported public API and **copies doc-comments 1:1** wherever they exist.
+I can, but I can’t directly access that URL from here. If you paste (or upload) the contents of the `src/` folder (or a zip of the repo / the TypeScript source files), I’ll generate a single consolidated `.d.ts` that represents the public API surface, and I’ll copy doc-comments **1:1** exactly as written.
 
-In the meantime, here’s exactly what I will produce and how you can generate it locally right now (so you don’t have to paste anything), plus a small post-processing script that collapses it into **one** `.d.ts` file.
+In the meantime, here are two quick ways to get me what I need, plus an optional “auto-bundle” approach you can run locally.
 
----
+## Option A (best): Upload a zip of `src/`
+1. Zip the `src/` directory (or the whole repo).
+2. Upload it here.
+3. Tell me if you want **only exported/public API** or **everything** (including internal types).
 
-## Option A (recommended): Generate one .d.ts from the repo locally
+## Option B: Paste file contents
+Paste the contents of all `.ts` files under `src/` (or at least all exported entrypoints like `src/index.ts`, `src/client.ts`, etc.).
 
-### 1) Ensure `tsconfig.json` emits declarations
-In the repo root, create/adjust `tsconfig.json` (or `tsconfig.build.json`) to include:
+## Option C: Generate a single `.d.ts` locally (then paste it)
+If you have the repo locally, you can often generate a rolled-up `.d.ts` via TypeScript. This won’t always preserve *all* doc-comments exactly, depending on TS settings and how the project is structured, but it’s a good starting point.
 
+1. Ensure `tsconfig.json` has:
 ```json
 {
   "compilerOptions": {
     "declaration": true,
     "emitDeclarationOnly": true,
     "declarationMap": false,
-    "stripInternal": false,
-    "removeComments": false,
-    "outDir": "dist-types",
-    "target": "ES2020",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "skipLibCheck": true
-  },
-  "include": ["src"]
-}
-```
-
-Notes:
-- `removeComments: false` is important so JSDoc can be preserved.
-- Some tooling strips comments anyway; we’ll address that with the bundling step.
-
-### 2) Build declarations
-```bash
-npx tsc -p tsconfig.json
-```
-
-This creates `dist-types/**/*.d.ts`.
-
-### 3) Bundle them into a single `.d.ts`
-Use `@microsoft/api-extractor` (best at preserving API shape) or `dts-bundle-generator`.
-
-#### Using API Extractor
-```bash
-npm i -D @microsoft/api-extractor
-```
-
-Create `api-extractor.json`:
-
-```json
-{
-  "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
-  "mainEntryPointFilePath": "<projectFolder>/dist-types/index.d.ts",
-  "dtsRollup": {
-    "enabled": true,
-    "untrimmedFilePath": "<projectFolder>/parallel-sdk.d.ts"
-  },
-  "apiReport": { "enabled": false },
-  "docModel": { "enabled": false },
-  "messages": {
-    "compilerMessageReporting": { "default": { "logLevel": "none" } },
-    "extractorMessageReporting": { "default": { "logLevel": "none" } },
-    "tsdocMessageReporting": { "default": { "logLevel": "none" } }
+    "stripInternal": false
   }
 }
 ```
 
-Run:
+2. Run:
 ```bash
-npx api-extractor run --local
+npx tsc -p tsconfig.json
 ```
 
-You’ll get a single file: `parallel-sdk.d.ts`.
+3. If it produces multiple `.d.ts` files, you can bundle them with something like:
+```bash
+npx dts-bundle-generator -o api-footprint.d.ts src/index.ts
+```
+
+Then paste `api-footprint.d.ts` here, and I can refine it into the “LLM-friendly” single-file footprint (keeping comments 1:1 where present in source).
 
 ---
 
-## Option B: If you want me to generate it here
+### Two clarifying questions
+1. Do you want the footprint to reflect **only what’s exported from the package entrypoint** (typical), or **every file/module** under `src/`?
+2. Should I preserve module structure (`declare module "parallel-sdk" { ... }`) or emit as a flat global `.d.ts` (usually not recommended)?
 
-Send one of these:
-1) A zip of the repo, or  
-2) The `src/` folder contents (all `.ts` files), plus `package.json` and any `tsconfig*.json`, or  
-3) The output of `tree src` and then paste each file.
-
-Then I’ll return a single `.d.ts` that:
-- Includes the full exported surface area (classes, functions, types, interfaces, enums, namespaces).
-- Keeps module structure if needed (or flattens to top-level exports—your choice).
-- Copies **doc-comments 1:1** exactly as in source (no edits).
-- Resolves re-exports so an LLM can understand the full footprint in one view.
-
----
-
-## Quick questions (so the output matches what you want)
-
-1) Should the final file be **module-based** (e.g. `declare module "@parallel-web/sdk" { ... }`) or just plain exports (`export *`)?
-2) What’s the package name you want in the `declare module "..."` wrapper (from `package.json:name`)?
-3) Do you want internal-only types included if they’re exported indirectly, or strictly the public exports from the package entrypoint?
-
----
-
-If you upload/paste the `src/` files (or a zip), I’ll produce the single consolidated `.d.ts` in my next message.
+Upload/paste the `src` code (or the generated declarations), and I’ll produce the single consolidated `.d.ts` as requested with doc-comments copied verbatim.

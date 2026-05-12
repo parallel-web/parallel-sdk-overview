@@ -1,29 +1,29 @@
-I can do this, but I can’t access external URLs from here. If you paste the repository contents (or upload a zip / paste the files under `src/parallel/**`), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API surface and copies docstrings 1:1.
+I can do this, but I can’t directly fetch or browse that GitHub URL from here. If you paste the package source (or upload a zip / tarball of `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that captures the public API surface and will copy docstrings/comments 1:1.
 
-### What I need from you
-Please provide **one** of the following:
+To make this easy, please provide **one** of the following:
 
-1) **Zip upload** of the repo (or just `src/parallel/`), or  
+1) **Upload** the `src/parallel/` folder contents (or the whole repo zip), or  
 2) Paste the output of:
 ```bash
-python -c "import os; \
-root='src/parallel'; \
-[print('---FILE:', os.path.join(dp,f)) or print(open(os.path.join(dp,f), 'r', encoding='utf-8').read()) \
- for dp,_,fs in os.walk(root) for f in fs if f.endswith('.py')]"
+python - << 'PY'
+import os, pathlib
+root = pathlib.Path("src/parallel")
+for p in sorted(root.rglob("*.py")):
+    print("\n# =====", p.as_posix(), "=====")
+    print(p.read_text(encoding="utf-8"))
+PY
 ```
-(or run it from the repo root)
 
-### What you’ll get
-- A **single** `parallel.pyi` that:
-  - Includes all public classes/functions/constants across the package
-  - Preserves module structure via qualified names (and/or section headers)
-  - Copies **docstrings exactly** where present (verbatim, no edits)
-  - Uses best-effort typing (from annotations if present; otherwise `Any`)
-  - Includes re-exports (`__init__.py` exports) so the “user-facing” surface is accurate
+### A couple of quick choices (tell me your preference)
+- **Single-file name**: `parallel.pyi` (default) or `__init__.pyi`
+- **Scope**: “public only” (exports in `__init__.py` + non-underscore names) vs “entire footprint” (everything, including internal modules). Your request says entire footprint; I’ll do that unless you say otherwise.
+- **Typing strictness**: keep existing annotations where present; otherwise I’ll use best-effort `Any` with imports from `typing`.
 
-### Quick confirmation questions (optional)
-If you want, tell me:
-- Should the `.pyi` reflect **only public** names (no leading `_`), or **everything**?
-- Should it include **internal** modules not imported by `parallel/__init__.py`?
+Once you share the code, I’ll return a single `.pyi` file that:
+- Includes all classes/functions/constants/TypedDicts/Protocols, etc.
+- Preserves module structure via comments like `# --- module: parallel.foo ---`
+- Copies docstrings/doc-comments **verbatim** (1:1) where present in the source
+- Includes `__all__` when defined
+- Avoids implementation bodies (stub style)
 
-Once you paste/upload `src/parallel`, I’ll return the consolidated `.pyi` in one code block.
+Send the source and I’ll generate it.
