@@ -1,29 +1,35 @@
-I can do this, but I can’t directly fetch or browse that GitHub URL from here. If you paste the package source (or upload a zip / tarball of `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that captures the public API surface and will copy docstrings/comments 1:1.
+I can do that, but I can’t access external URLs (including uithub) from here to read the repository contents.
 
-To make this easy, please provide **one** of the following:
+If you paste the source (or upload a zip / paste the `src/parallel/` tree contents), I’ll generate a single consolidated `parallel.pyi` that:
 
-1) **Upload** the `src/parallel/` folder contents (or the whole repo zip), or  
-2) Paste the output of:
+- Includes the public API surface across all modules in `src/parallel/`
+- Preserves *docstrings 1:1* (verbatim) wherever they exist
+- Re-exports the appropriate symbols to reflect how the package is meant to be imported
+- Adds typing imports and forward refs as needed, without changing runtime behavior (since `.pyi` only)
+
+### What I need from you
+Either of these:
+
+1) **Upload/paste the files** from `src/parallel/` (all `.py` files), or  
+2) Run this locally and paste the output here:
+
 ```bash
-python - << 'PY'
+python - <<'PY'
 import os, pathlib
+
 root = pathlib.Path("src/parallel")
 for p in sorted(root.rglob("*.py")):
-    print("\n# =====", p.as_posix(), "=====")
+    print("\n" + "="*80)
+    print(str(p))
+    print("="*80)
     print(p.read_text(encoding="utf-8"))
 PY
 ```
 
-### A couple of quick choices (tell me your preference)
-- **Single-file name**: `parallel.pyi` (default) or `__init__.pyi`
-- **Scope**: “public only” (exports in `__init__.py` + non-underscore names) vs “entire footprint” (everything, including internal modules). Your request says entire footprint; I’ll do that unless you say otherwise.
-- **Typing strictness**: keep existing annotations where present; otherwise I’ll use best-effort `Any` with imports from `typing`.
+If the package also has important exports defined in `src/parallel/__init__.py`, make sure that file is included (the command above will include it).
 
-Once you share the code, I’ll return a single `.pyi` file that:
-- Includes all classes/functions/constants/TypedDicts/Protocols, etc.
-- Preserves module structure via comments like `# --- module: parallel.foo ---`
-- Copies docstrings/doc-comments **verbatim** (1:1) where present in the source
-- Includes `__all__` when defined
-- Avoids implementation bodies (stub style)
+### A couple of preferences (tell me which you want)
+- **Single flat file** that contains all classes/functions in one namespace (easy for LLMs), or
+- **Single file with module sections** (e.g., `# --- parallel.client ---`) preserving module boundaries (often clearer)
 
-Send the source and I’ll generate it.
+Once you provide the code, I’ll return the complete `.pyi` in one block ready to save as `parallel.pyi`.

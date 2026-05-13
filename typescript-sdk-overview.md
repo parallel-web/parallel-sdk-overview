@@ -1,46 +1,28 @@
-I can, but I can’t directly access that URL from here. If you paste (or upload) the contents of the `src/` folder (or a zip of the repo / the TypeScript source files), I’ll generate a single consolidated `.d.ts` that represents the public API surface, and I’ll copy doc-comments **1:1** exactly as written.
+I can do this, but I can’t directly fetch that URL from here. If you paste the contents of the `src/` folder (or upload a zip / provide the raw files), I’ll generate a single consolidated `parallel-sdk-typescript.d.ts` that:
 
-In the meantime, here are two quick ways to get me what I need, plus an optional “auto-bundle” approach you can run locally.
+- re-exports the public surface area (barrels, main entrypoints)
+- includes all public types, interfaces, classes, function signatures
+- preserves **doc-comments 1:1** exactly as in the source (no edits)
+- flattens everything into one file suitable for an LLM to read
 
-## Option A (best): Upload a zip of `src/`
-1. Zip the `src/` directory (or the whole repo).
-2. Upload it here.
-3. Tell me if you want **only exported/public API** or **everything** (including internal types).
+### What I need from you
+Please provide one of the following:
 
-## Option B: Paste file contents
-Paste the contents of all `.ts` files under `src/` (or at least all exported entrypoints like `src/index.ts`, `src/client.ts`, etc.).
+1) **Upload a zip** of `src/`  
+or  
+2) Paste the output of these commands:
 
-## Option C: Generate a single `.d.ts` locally (then paste it)
-If you have the repo locally, you can often generate a rolled-up `.d.ts` via TypeScript. This won’t always preserve *all* doc-comments exactly, depending on TS settings and how the project is structured, but it’s a good starting point.
-
-1. Ensure `tsconfig.json` has:
-```json
-{
-  "compilerOptions": {
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "declarationMap": false,
-    "stripInternal": false
-  }
-}
-```
-
-2. Run:
 ```bash
-npx tsc -p tsconfig.json
+# from the repo root
+find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print
 ```
 
-3. If it produces multiple `.d.ts` files, you can bundle them with something like:
-```bash
-npx dts-bundle-generator -o api-footprint.d.ts src/index.ts
-```
+Then paste the contents of each file (especially anything like `src/index.ts`, `src/client.ts`, `src/types.ts`, etc.).  
+or  
+3) If you can run a script locally, I can give you a small Node script that emits a single `.d.ts` by walking the folder and extracting exported declarations + JSDoc.
 
-Then paste `api-footprint.d.ts` here, and I can refine it into the “LLM-friendly” single-file footprint (keeping comments 1:1 where present in source).
+### A couple clarifying questions (so the .d.ts matches what you want)
+1) Should the single `.d.ts` represent **only the public API** (what consumers import), or literally *everything* in `src/` including internal modules?  
+2) What is the package entry import you want represented—e.g. `import { Parallel } from "parallel-sdk"` or something else?
 
----
-
-### Two clarifying questions
-1. Do you want the footprint to reflect **only what’s exported from the package entrypoint** (typical), or **every file/module** under `src/`?
-2. Should I preserve module structure (`declare module "parallel-sdk" { ... }`) or emit as a flat global `.d.ts` (usually not recommended)?
-
-Upload/paste the `src` code (or the generated declarations), and I’ll produce the single consolidated `.d.ts` as requested with doc-comments copied verbatim.
+Once you share the `src/` contents (or answer the two questions + provide files), I’ll return the consolidated `.d.ts` in one block.
