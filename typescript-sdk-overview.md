@@ -1,28 +1,37 @@
-I can do this, but I can’t directly fetch that URL from here. If you paste the contents of the `src/` folder (or upload a zip / provide the raw files), I’ll generate a single consolidated `parallel-sdk-typescript.d.ts` that:
+I can do that, but I can’t directly access external URLs from here. If you paste the contents of that `src/` directory (or upload a zip / paste key files like `index.ts` + any exported modules), I’ll generate a single consolidated `.d.ts` that reflects the public API surface, and I’ll copy over doc-comments 1:1.
 
-- re-exports the public surface area (barrels, main entrypoints)
-- includes all public types, interfaces, classes, function signatures
-- preserves **doc-comments 1:1** exactly as in the source (no edits)
-- flattens everything into one file suitable for an LLM to read
+To make this quick, here are two easy options:
 
-### What I need from you
-Please provide one of the following:
-
-1) **Upload a zip** of `src/`  
-or  
-2) Paste the output of these commands:
+## Option A (best): paste an auto-bundle of the repo’s exported TS
+Run this locally and paste the output:
 
 ```bash
 # from the repo root
-find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print
+git ls-files "src/**/*.ts" "src/**/*.tsx" | sort | xargs -I{} sh -c 'echo "\n\n// FILE: {}\n"; cat "{}"' > /tmp/parallel-src.txt
+cat /tmp/parallel-src.txt
 ```
 
-Then paste the contents of each file (especially anything like `src/index.ts`, `src/client.ts`, `src/types.ts`, etc.).  
-or  
-3) If you can run a script locally, I can give you a small Node script that emits a single `.d.ts` by walking the folder and extracting exported declarations + JSDoc.
+Or, if there are many files, upload `/tmp/parallel-src.txt`.
 
-### A couple clarifying questions (so the .d.ts matches what you want)
-1) Should the single `.d.ts` represent **only the public API** (what consumers import), or literally *everything* in `src/` including internal modules?  
-2) What is the package entry import you want represented—e.g. `import { Parallel } from "parallel-sdk"` or something else?
+## Option B: paste only the public surface
+If there’s a single barrel file, paste:
+- `src/index.ts` (and any re-exported barrels)
+- any `src/**/index.ts` files
+- the referenced types/classes/modules they export
 
-Once you share the `src/` contents (or answer the two questions + provide files), I’ll return the consolidated `.d.ts` in one block.
+---
+
+### What I will produce
+A single file, e.g. `parallel-sdk.d.ts`, that:
+- includes `declare module "..."` blocks as needed (or a flat global module, depending on package style)
+- contains only the *publicly exported* types/classes/functions/interfaces
+- preserves doc-comments exactly as-is (including tags like `@deprecated`, `@example`, etc.)
+- resolves re-exports into one coherent declaration footprint (LLM-friendly)
+
+---
+
+If you want, tell me the intended module name for the declarations (e.g. `"@parallel-web/sdk"`), and whether you prefer:
+1) `declare module "<pkg-name>" { ... }` style, or  
+2) just top-level `export ...` declarations (TS “module” style).
+
+Send the code (Option A or B), and I’ll return the single `.d.ts` in one response.
