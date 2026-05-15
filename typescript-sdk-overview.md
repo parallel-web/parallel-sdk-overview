@@ -1,37 +1,29 @@
-I can do that, but I can’t directly access external URLs from here. If you paste the contents of that `src/` directory (or upload a zip / paste key files like `index.ts` + any exported modules), I’ll generate a single consolidated `.d.ts` that reflects the public API surface, and I’ll copy over doc-comments 1:1.
+I can do that, but I can’t access external URLs directly from here (including uithub.com) to read the repository contents. If you paste the source (or upload a zip / the `src/` folder contents), I’ll generate a single consolidated `index.d.ts` that summarizes the full public API surface and will copy doc-comments **1:1** wherever they appear.
 
-To make this quick, here are two easy options:
+Here’s what I need from you:
 
-## Option A (best): paste an auto-bundle of the repo’s exported TS
-Run this locally and paste the output:
+1. **All files under `src/`** (or at least all exported/public ones), including any `index.ts` barrel files.
+2. Any **generated types** or **OpenAPI-derived** files if they’re part of the SDK’s exports.
+3. Tell me the intended entrypoint (usually `src/index.ts`).
 
-```bash
-# from the repo root
-git ls-files "src/**/*.ts" "src/**/*.tsx" | sort | xargs -I{} sh -c 'echo "\n\n// FILE: {}\n"; cat "{}"' > /tmp/parallel-src.txt
-cat /tmp/parallel-src.txt
-```
-
-Or, if there are many files, upload `/tmp/parallel-src.txt`.
-
-## Option B: paste only the public surface
-If there’s a single barrel file, paste:
-- `src/index.ts` (and any re-exported barrels)
-- any `src/**/index.ts` files
-- the referenced types/classes/modules they export
-
----
+### Quick way to provide it
+- Upload a zip of the repo, or
+- Paste the output of:
+  - `ls -R src`
+  - and the contents of each file under `src/` (you can paste in multiple messages)
 
 ### What I will produce
-A single file, e.g. `parallel-sdk.d.ts`, that:
-- includes `declare module "..."` blocks as needed (or a flat global module, depending on package style)
-- contains only the *publicly exported* types/classes/functions/interfaces
-- preserves doc-comments exactly as-is (including tags like `@deprecated`, `@example`, etc.)
-- resolves re-exports into one coherent declaration footprint (LLM-friendly)
+- A **single** `.d.ts` file (e.g. `parallel-sdk.d.ts`) that:
+  - Re-exports the public API (types, classes, functions, constants)
+  - Flattens/merges modules into one declaration file
+  - Preserves **all existing JSDoc doc-comments exactly 1:1** (no rewording)
+  - Uses `declare namespace`/`declare module` only if necessary (I’ll prefer top-level `export` declarations for LLM readability)
 
----
+### One clarification
+Do you want the `.d.ts` to reflect:
+- **Only the public exports** reachable from the package entrypoint (recommended), or
+- **Everything in `src/`**, even if not exported?
 
-If you want, tell me the intended module name for the declarations (e.g. `"@parallel-web/sdk"`), and whether you prefer:
-1) `declare module "<pkg-name>" { ... }` style, or  
-2) just top-level `export ...` declarations (TS “module” style).
-
-Send the code (Option A or B), and I’ll return the single `.d.ts` in one response.
+Reply with:
+1) “public exports only” or “everything”, and  
+2) paste/upload the `src/` contents.
