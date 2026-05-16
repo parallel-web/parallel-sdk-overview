@@ -1,25 +1,26 @@
-I can, but I can’t fetch that GitHub/uithub URL from here. If you paste the package source (or upload a zip / the `src/parallel` folder contents), I’ll generate a single consolidated `parallel.pyi` that mirrors the full public footprint and copies docstrings 1:1.
+I can do this, but I can’t access that URL from here directly. If you paste the repository contents (or upload a zip / paste the files under `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that:
 
-Meanwhile, here’s exactly what I need and what I will produce:
+- Exposes the full public API footprint (modules, classes, functions, methods, attributes, exports)
+- Preserves docstrings/comments **verbatim 1:1** wherever they exist (I’ll copy them as-is into the stubs)
+- Uses precise typing (including `TypedDict`, `Literal`, overloads, generics) where the source makes it inferable
 
-## What to send
-Either:
-1) A zip of `src/parallel/`, or  
-2) Paste the contents of all `*.py` files under `src/parallel/` (including `__init__.py`), or  
-3) Provide the raw file contents for each file in that tree.
+### What I need from you
+One of these options:
 
-## What I will output
-A **single** `.pyi` file (e.g. `parallel.pyi`) that:
-- Includes all public modules/classes/functions/constants/types exposed by the package
-- Preserves **docstrings 1:1** (module, class, method, function docstrings)
-- Resolves re-exports (`from .x import y`) so the LLM can “see” the API in one place
-- Includes overloads / generics / TypedDict / Protocol if present
-- Keeps signatures faithful (including defaults, kw-only, positional-only where possible)
-- Marks private/internal items as omitted unless they are part of the public API
+1) **Upload** the `src/parallel/` folder (or the whole repo) here, or  
+2) Paste the contents of all `.py` files under `src/parallel/` (including `__init__.py`), or  
+3) Paste the output of these commands:
 
-## One quick question (so I structure the .pyi correctly)
-Do you want the single file to represent:
-- **Only the public API** (what a user imports from `parallel`), or
-- **Everything in `src/parallel`** (including internal modules)?
+```bash
+# from repo root
+python -c "import pathlib; p=pathlib.Path('src/parallel'); 
+print('\n'.join(str(x) for x in p.rglob('*.py')))"
+```
 
-Reply with your preference and paste/upload the sources; I’ll return the consolidated `.pyi` in one block.
+Then for each listed file, paste its content.
+
+### A quick clarification
+- Do you want the stub to represent **only the public API** (i.e., what’s exported via `parallel/__init__.py` and documented entrypoints), or **everything** in `src/parallel/` including internal modules/underscored names?
+- What should the output file be named? (`parallel.pyi` vs `__init__.pyi` + merged content). If you don’t care, I’ll produce `parallel.pyi`.
+
+Once you provide the code, I’ll return a single `.pyi` file in one code block.

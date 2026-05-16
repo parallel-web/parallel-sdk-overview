@@ -1,29 +1,77 @@
-I can do that, but I can’t access external URLs directly from here (including uithub.com) to read the repository contents. If you paste the source (or upload a zip / the `src/` folder contents), I’ll generate a single consolidated `index.d.ts` that summarizes the full public API surface and will copy doc-comments **1:1** wherever they appear.
+I can do that, but I can’t directly fetch that GitHub URL from here. If you paste the contents of the `src/` directory (or upload a zip / paste key files), I’ll generate a single consolidated `.d.ts` that summarizes the public API footprint and I’ll copy doc-comments over **verbatim**.
 
-Here’s what I need from you:
+In the meantime, here are two fast ways to get me what I need:
 
-1. **All files under `src/`** (or at least all exported/public ones), including any `index.ts` barrel files.
-2. Any **generated types** or **OpenAPI-derived** files if they’re part of the SDK’s exports.
-3. Tell me the intended entrypoint (usually `src/index.ts`).
+## Option A (best): Paste the generated `.d.ts` from your local build
+If the project already produces type declarations:
 
-### Quick way to provide it
-- Upload a zip of the repo, or
-- Paste the output of:
-  - `ls -R src`
-  - and the contents of each file under `src/` (you can paste in multiple messages)
+1. Ensure `tsconfig.json` has:
+   ```json
+   {
+     "compilerOptions": {
+       "declaration": true,
+       "emitDeclarationOnly": true,
+       "declarationMap": false,
+       "outDir": "dist-types"
+     }
+   }
+   ```
+2. Run:
+   ```bash
+   npx tsc -p tsconfig.json
+   ```
+3. Zip or paste the emitted `.d.ts` files from `dist-types/`.
 
-### What I will produce
-- A **single** `.d.ts` file (e.g. `parallel-sdk.d.ts`) that:
-  - Re-exports the public API (types, classes, functions, constants)
-  - Flattens/merges modules into one declaration file
-  - Preserves **all existing JSDoc doc-comments exactly 1:1** (no rewording)
-  - Uses `declare namespace`/`declare module` only if necessary (I’ll prefer top-level `export` declarations for LLM readability)
+Then I’ll merge them into a single `index.d.ts` “API surface” file.
 
-### One clarification
-Do you want the `.d.ts` to reflect:
-- **Only the public exports** reachable from the package entrypoint (recommended), or
-- **Everything in `src/`**, even if not exported?
+## Option B: Paste the `src/` files
+Run one of these and paste the output.
 
-Reply with:
-1) “public exports only” or “everything”, and  
-2) paste/upload the `src/` contents.
+**Mac/Linux:**
+```bash
+python - << 'PY'
+import os
+root="src"
+for dirpath,_,files in os.walk(root):
+  for f in sorted(files):
+    if f.endswith((".ts",".tsx")) and not f.endswith((".test.ts",".spec.ts")):
+      p=os.path.join(dirpath,f)
+      print("\n\n// ===== FILE:",p,"=====\n")
+      print(open(p,"r",encoding="utf-8").read())
+PY
+```
+
+**Windows (PowerShell):**
+```powershell
+Get-ChildItem -Recurse src -Include *.ts,*.tsx |
+  Where-Object { $_.Name -notmatch '\.(test|spec)\.ts$' } |
+  ForEach-Object {
+    "`n`n// ===== FILE: $($_.FullName) =====`n"
+    Get-Content $_.FullName -Raw
+  }
+```
+
+---
+
+## What I will produce
+A single `parallel-sdk-typescript.d.ts` that:
+
+- Exports the same public entrypoints as the SDK (e.g. what `src/index.ts` exports)
+- Includes all public classes/functions/types/interfaces/enums
+- Preserves JSDoc/doc-comments **1:1** (no edits)
+- Collapses internal/private implementation details where possible (LLM-friendly footprint)
+- Keeps module structure if needed (either as one flat module or `declare module` blocks)
+
+---
+
+## Quick question (so I format it correctly)
+Which style do you want?
+
+1. **Flat** (single module): `export ...` from one file (best for LLMs)
+2. **Module-declared**: `declare module "@parallel/..."`
+3. Match **exact package name** as used on npm (tell me the import path you use, e.g. `import { Parallel } from "parallel-sdk"`)
+
+Reply with either:
+- the `src/index.ts` + any exported files, or
+- the full `src/` dump,
+and your preferred style (1/2/3).
