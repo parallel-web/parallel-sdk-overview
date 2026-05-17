@@ -1,26 +1,62 @@
-I can do this, but I can’t access that URL from here directly. If you paste the repository contents (or upload a zip / paste the files under `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that:
+I can do this, but I can’t directly fetch or read that GitHub/Uithub URL from within this chat. If you paste the source tree contents (or upload a zip / paste the files under `src/parallel/`), I’ll generate a single consolidated `parallel.pyi` that mirrors the public API and copies docstrings/comments 1:1.
 
-- Exposes the full public API footprint (modules, classes, functions, methods, attributes, exports)
-- Preserves docstrings/comments **verbatim 1:1** wherever they exist (I’ll copy them as-is into the stubs)
-- Uses precise typing (including `TypedDict`, `Literal`, overloads, generics) where the source makes it inferable
+To make this easy, here are two options:
 
-### What I need from you
-One of these options:
+## Option A (best): upload files
+Upload a zip of `src/parallel/` (or the whole repo). I’ll return one `.pyi` file.
 
-1) **Upload** the `src/parallel/` folder (or the whole repo) here, or  
-2) Paste the contents of all `.py` files under `src/parallel/` (including `__init__.py`), or  
-3) Paste the output of these commands:
+## Option B: paste via `tree` + file contents
+Paste:
+1) the output of `tree src/parallel -a`  
+2) the contents of each `.py` file under `src/parallel/`
 
+---
+
+## If you want to generate it locally (I’ll still refine it)
+If you can run one command locally to dump all sources into a single text blob, use:
+
+### macOS/Linux
 ```bash
-# from repo root
-python -c "import pathlib; p=pathlib.Path('src/parallel'); 
-print('\n'.join(str(x) for x in p.rglob('*.py')))"
+python - <<'PY'
+import os, pathlib
+
+root = pathlib.Path("src/parallel")
+for path in sorted(root.rglob("*.py")):
+    print("\n" + "="*80)
+    print(str(path))
+    print("="*80)
+    print(path.read_text(encoding="utf-8", errors="replace"))
+PY
 ```
 
-Then for each listed file, paste its content.
+### Windows (PowerShell)
+```powershell
+python - <<'PY'
+import pathlib
+root = pathlib.Path("src/parallel")
+for path in sorted(root.rglob("*.py")):
+    print("\n" + "="*80)
+    print(str(path))
+    print("="*80)
+    print(path.read_text(encoding="utf-8", errors="replace"))
+PY
+```
 
-### A quick clarification
-- Do you want the stub to represent **only the public API** (i.e., what’s exported via `parallel/__init__.py` and documented entrypoints), or **everything** in `src/parallel/` including internal modules/underscored names?
-- What should the output file be named? (`parallel.pyi` vs `__init__.pyi` + merged content). If you don’t care, I’ll produce `parallel.pyi`.
+Paste the output here and I’ll produce the unified `.pyi`.
 
-Once you provide the code, I’ll return a single `.pyi` file in one code block.
+---
+
+## What I will deliver
+A single `parallel.pyi` that:
+- Includes **all public modules/classes/functions/constants** exposed in `src/parallel`
+- Preserves **docstrings/doc-comments 1:1** where present (I’ll copy them verbatim into stubs, typically as triple-quoted docstrings on the relevant symbol)
+- Uses `typing` constructs (`Protocol`, `TypedDict`, `Literal`, `overload`, etc.) when helpful
+- Includes re-exports defined by `__init__.py` so the “footprint” matches what users import
+
+---
+
+## Two quick questions (so I match your intent)
+1) Do you want **only the public API** (things exported via `__init__.py` and non-underscore names), or **everything** including internal `_` modules/classes?  
+2) Should the output be a **single top-level** `parallel.pyi` (with all symbols flattened), or a **package-style stub** in one file that still contains module section headers (comment-delimited) for readability?
+
+Send the files (or the pasted dump) and your answers, and I’ll generate the `.pyi`.

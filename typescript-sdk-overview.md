@@ -1,77 +1,26 @@
-I can do that, but I can’t directly fetch that GitHub URL from here. If you paste the contents of the `src/` directory (or upload a zip / paste key files), I’ll generate a single consolidated `.d.ts` that summarizes the public API footprint and I’ll copy doc-comments over **verbatim**.
+I can do that, but I can’t directly fetch GitHub content from that URL in this chat. If you paste the repo contents (or let me know the exact files to include), I’ll generate a single consolidated `.d.ts` that summarizes the API footprint and **copies doc-comments 1:1**.
 
-In the meantime, here are two fast ways to get me what I need:
-
-## Option A (best): Paste the generated `.d.ts` from your local build
-If the project already produces type declarations:
-
-1. Ensure `tsconfig.json` has:
-   ```json
-   {
-     "compilerOptions": {
-       "declaration": true,
-       "emitDeclarationOnly": true,
-       "declarationMap": false,
-       "outDir": "dist-types"
-     }
-   }
-   ```
-2. Run:
-   ```bash
-   npx tsc -p tsconfig.json
-   ```
-3. Zip or paste the emitted `.d.ts` files from `dist-types/`.
-
-Then I’ll merge them into a single `index.d.ts` “API surface” file.
-
-## Option B: Paste the `src/` files
-Run one of these and paste the output.
-
-**Mac/Linux:**
+### What I need from you (pick one)
+1) **Upload/attach** a zip of `src/` (or the whole repo), or  
+2) **Paste** the TypeScript source files from `src/` here (can be multiple messages), or  
+3) Run a command locally and paste the output:
 ```bash
-python - << 'PY'
-import os
-root="src"
-for dirpath,_,files in os.walk(root):
-  for f in sorted(files):
-    if f.endswith((".ts",".tsx")) and not f.endswith((".test.ts",".spec.ts")):
-      p=os.path.join(dirpath,f)
-      print("\n\n// ===== FILE:",p,"=====\n")
-      print(open(p,"r",encoding="utf-8").read())
-PY
+git clone https://github.com/parallel-web/parallel-sdk-typescript.git
+cd parallel-sdk-typescript
+find src -type f -maxdepth 20 -print
 ```
+Then either paste the files’ contents, or zip `src/` and upload it.
 
-**Windows (PowerShell):**
-```powershell
-Get-ChildItem -Recurse src -Include *.ts,*.tsx |
-  Where-Object { $_.Name -notmatch '\.(test|spec)\.ts$' } |
-  ForEach-Object {
-    "`n`n// ===== FILE: $($_.FullName) =====`n"
-    Get-Content $_.FullName -Raw
-  }
-```
+### What I will produce
+- A **single** `parallel-sdk-typescript.d.ts` file that:
+  - Exports the public API surface (classes/functions/types/interfaces/enums).
+  - Preserves **all existing doc-comments exactly** (copied 1:1).
+  - Flattens/re-exports modules so an LLM can understand usage from one file.
+  - Includes method/property signatures, overloads, generics, and key type aliases.
+  - Avoids implementation bodies (declaration-only).
 
----
+### Quick questions (so I match your intent)
+1) Should the `.d.ts` reflect **only what’s exported from the package entrypoint** (e.g., `src/index.ts` / `package.json` `exports`), or **everything in `src/`** even if not exported?
+2) Should I keep module boundaries (e.g., `declare module "parallel-sdk"`), or just output top-level `export ...` declarations?
 
-## What I will produce
-A single `parallel-sdk-typescript.d.ts` that:
-
-- Exports the same public entrypoints as the SDK (e.g. what `src/index.ts` exports)
-- Includes all public classes/functions/types/interfaces/enums
-- Preserves JSDoc/doc-comments **1:1** (no edits)
-- Collapses internal/private implementation details where possible (LLM-friendly footprint)
-- Keeps module structure if needed (either as one flat module or `declare module` blocks)
-
----
-
-## Quick question (so I format it correctly)
-Which style do you want?
-
-1. **Flat** (single module): `export ...` from one file (best for LLMs)
-2. **Module-declared**: `declare module "@parallel/..."`
-3. Match **exact package name** as used on npm (tell me the import path you use, e.g. `import { Parallel } from "parallel-sdk"`)
-
-Reply with either:
-- the `src/index.ts` + any exported files, or
-- the full `src/` dump,
-and your preferred style (1/2/3).
+Once you provide the `src/` contents (or a zip), I’ll return the single consolidated `.d.ts` file.
