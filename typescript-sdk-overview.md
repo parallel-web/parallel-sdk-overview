@@ -1,26 +1,21 @@
-I can do that, but I can’t directly fetch GitHub content from that URL in this chat. If you paste the repo contents (or let me know the exact files to include), I’ll generate a single consolidated `.d.ts` that summarizes the API footprint and **copies doc-comments 1:1**.
+I can do that, but I can’t directly fetch or browse that GitHub URL from here. If you paste the contents of the `src/` files (or upload a zip / provide the repo as text), I’ll generate a single consolidated `index.d.ts` that:
 
-### What I need from you (pick one)
-1) **Upload/attach** a zip of `src/` (or the whole repo), or  
-2) **Paste** the TypeScript source files from `src/` here (can be multiple messages), or  
-3) Run a command locally and paste the output:
-```bash
-git clone https://github.com/parallel-web/parallel-sdk-typescript.git
-cd parallel-sdk-typescript
-find src -type f -maxdepth 20 -print
-```
-Then either paste the files’ contents, or zip `src/` and upload it.
+- Exposes the full public surface area (types, interfaces, classes, functions, exports).
+- Preserves **all existing doc-comments 1:1** (copied verbatim, no edits).
+- Resolves re-exports into one file so an LLM can “see” the complete API footprint at a glance.
 
-### What I will produce
-- A **single** `parallel-sdk-typescript.d.ts` file that:
-  - Exports the public API surface (classes/functions/types/interfaces/enums).
-  - Preserves **all existing doc-comments exactly** (copied 1:1).
-  - Flattens/re-exports modules so an LLM can understand usage from one file.
-  - Includes method/property signatures, overloads, generics, and key type aliases.
-  - Avoids implementation bodies (declaration-only).
+### What I need from you
+Pick one option:
 
-### Quick questions (so I match your intent)
-1) Should the `.d.ts` reflect **only what’s exported from the package entrypoint** (e.g., `src/index.ts` / `package.json` `exports`), or **everything in `src/`** even if not exported?
-2) Should I keep module boundaries (e.g., `declare module "parallel-sdk"`), or just output top-level `export ...` declarations?
+1) **Upload a zip** of `src/` (best), or  
+2) Paste the files (especially `src/index.ts` plus everything it exports), or  
+3) Paste the output of:
+   - `tree -a src`
+   - and then the contents of each `.ts` file.
 
-Once you provide the `src/` contents (or a zip), I’ll return the single consolidated `.d.ts` file.
+### Notes / preferences (tell me if any apply)
+- Target module style: `export =` / `export default` vs pure ES `export` (I’ll mirror the repo).
+- Include internal/private symbols or only what’s exported from the package entrypoint (default: only public exports).
+- If there are runtime values (constants/classes) I’ll declare them in `.d.ts` as appropriate.
+
+Once you provide the source, I’ll return a **single `.d.ts` file** in one code block.
